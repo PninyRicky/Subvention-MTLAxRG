@@ -10,6 +10,7 @@ export type ParsedProgramPayload = {
   organization: string;
   summary: string;
   officialUrl: string;
+  sourceLandingUrl?: string | null;
   governmentLevel: string;
   region: string;
   status: ProgramStatus;
@@ -20,6 +21,9 @@ export type ParsedProgramPayload = {
   eligibleExpenses: string[];
   maxAmount: string | null;
   maxCoveragePct: number | null;
+  details: string | null;
+  eligibilityNotes: string | null;
+  applicationNotes: string | null;
   openStatusReason: string;
   intakeWindow: {
     rolling: boolean;
@@ -34,10 +38,14 @@ type FallbackPayload = {
   name?: string;
   organization?: string;
   summary?: string;
+  officialUrl?: string;
   governmentLevel?: string;
   region?: string;
   status?: string;
   confidence?: number;
+  details?: string;
+  eligibilityNotes?: string;
+  applicationNotes?: string;
   applicantTypes?: string[];
   sectors?: string[];
   projectStages?: string[];
@@ -97,6 +105,90 @@ function detectList(text: string, dictionary: string[]) {
   return dictionary.filter((entry) => normalized.includes(entry.toLowerCase()));
 }
 
+function toAbsoluteUrl(sourceUrl: string, href: string) {
+  try {
+    return new URL(href, sourceUrl).toString();
+  } catch {
+    return sourceUrl;
+  }
+}
+
+function normalizeWords(input: string) {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3);
+}
+
+function pickDirectOfficialUrl(
+  source: SourceRegistry,
+  $: cheerio.CheerioAPI | null,
+  targetName: string,
+  fallbackPayload?: FallbackPayload | null,
+) {
+  if (fallbackPayload?.officialUrl) {
+    return fallbackPayload.officialUrl;
+  }
+
+  if (!$) {
+    return source.url;
+  }
+
+  const targetWords = normalizeWords(targetName);
+  let bestHref = source.url;
+  let bestScore = 0;
+
+  $("a[href]").each((_, element) => {
+    const href = $(element).attr("href");
+    const text = $(element).text().replace(/\s+/g, " ").trim();
+
+    if (!href || !text) {
+      return;
+    }
+
+    const absoluteHref = toAbsoluteUrl(source.url, href);
+    if (!absoluteHref.startsWith("http")) {
+      return;
+    }
+
+    const haystack = `${text} ${absoluteHref}`.toLowerCase();
+    let score = 0;
+
+    for (const word of targetWords) {
+      if (haystack.includes(word)) {
+        score += 2;
+      }
+    }
+
+    if (haystack.includes("programme") || haystack.includes("subvention") || haystack.includes("aide")) {
+      score += 1;
+    }
+
+    if (absoluteHref.endsWith(".pdf")) {
+      score += 2;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestHref = absoluteHref;
+    }
+  });
+
+  return bestHref;
+}
+
+function extractBodyExcerpt(bodyText: string, maxLength = 420) {
+  if (!bodyText) {
+    return null;
+  }
+
+  const excerpt = bodyText.slice(0, maxLength).trim();
+  return excerpt.length ? excerpt : null;
+}
+
 export function parseProgramFromSource(
   source: SourceRegistry,
   html: string | null,
@@ -109,7 +201,6 @@ export function parseProgramFromSource(
   const metaDescription =
     $?.('meta[name="description"]').attr("content")?.trim() ||
     String(parsedFallback.summary ?? source.description ?? "");
-
   const statusInfo = getStatusFromText(bodyText || metaDescription, source.type);
   const candidateCloseDate = parseFrenchDateFromText(bodyText);
 
@@ -146,6 +237,18 @@ export function parseProgramFromSource(
       ...detectList(bodyText, ["photo", "video", "branding", "site web", "campagne numerique", "preproduction"]),
     ]),
   );
+  const directOfficialUrl = pickDirectOfficialUrl(source, $, pageTitle, parsedFallback);
+  const details = parsedFallback.details ?? extractBodyExcerpt(bodyText, 560) ?? metaDescription;
+  const eligibilityNotes =
+    parsedFallback.eligibilityNotes ??
+    (applicantTypes.length || eligibleExpenses.length
+      ? `Demandeurs detectes: ${applicantTypes.join(", ") || "a confirmer"}. Depenses reperees: ${eligibleExpenses.join(", ") || "a confirmer"}.`
+      : null);
+  const applicationNotes =
+    parsedFallback.applicationNotes ??
+    (candidateCloseDate
+      ? `Le prochain repere de depot detecte est autour du ${candidateCloseDate.toLocaleDateString("fr-CA")}. Toujours revalider sur la page officielle avant depot.`
+      : "Verifier la page officielle pour la date limite, les formulaires et les pieces a joindre.");
 
   const reviewFields: string[] = [];
   if (!candidateCloseDate && !(parsedFallback.intakeWindow?.rolling ?? false)) {
@@ -168,7 +271,8 @@ export function parseProgramFromSource(
     name: pageTitle,
     organization: String(parsedFallback.organization ?? source.name),
     summary: metaDescription,
-    officialUrl: source.url,
+    officialUrl: directOfficialUrl,
+    sourceLandingUrl: source.url,
     governmentLevel: String(parsedFallback.governmentLevel ?? source.governmentLevel ?? "A confirmer"),
     region: String(parsedFallback.region ?? "Quebec"),
     status:
@@ -176,6 +280,9 @@ export function parseProgramFromSource(
         ? statusInfo.status
         : ProgramStatus.REVIEW,
     confidence,
+    details,
+    eligibilityNotes,
+    applicationNotes,
     applicantTypes,
     sectors,
     projectStages,

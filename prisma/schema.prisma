@@ -119,12 +119,17 @@ model FundingProgram {
   organization     String
   summary          String            @db.Text
   officialUrl      String
+  sourceLandingUrl String?
   governmentLevel  String
   region           String
   status           ProgramStatus     @default(REVIEW)
   confidence       Int               @default(50)
   maxAmount        String?
   maxCoveragePct   Int?
+  details          String?           @db.Text
+  eligibilityNotes String?           @db.Text
+  applicationNotes String?           @db.Text
+  isFavorite       Boolean           @default(false)
   applicantTypes   String[]
   sectors          String[]
   projectStages    String[]

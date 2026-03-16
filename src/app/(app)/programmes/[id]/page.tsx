@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { MatchStatus, ReviewStatus } from "@prisma/client";
+import { ExternalLink } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
@@ -52,6 +54,7 @@ export default async function ProgrammeDetailPage({
               <Badge tone={tone}>{program.status}</Badge>
               <Badge>{program.governmentLevel}</Badge>
               <Badge>{program.region}</Badge>
+              {program.isFavorite ? <Badge tone="eligible">Favori</Badge> : null}
             </div>
             <h1 className="mt-4 text-4xl font-medium tracking-[-0.07em]">{program.name}</h1>
             <p className="mt-2 text-sm uppercase tracking-[0.16em] text-black/45">{program.organization}</p>
@@ -59,6 +62,9 @@ export default async function ProgrammeDetailPage({
           </div>
 
           <div className="min-w-[260px] space-y-2 text-sm text-black/64">
+            <div className="mb-4">
+              <FavoriteToggleButton programId={program.id} isFavorite={program.isFavorite} />
+            </div>
             <p>
               <span className="font-medium text-black">Confiance:</span> {program.confidence}%
             </p>
@@ -81,16 +87,52 @@ export default async function ProgrammeDetailPage({
               href={program.officialUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex text-sm text-[color:var(--accent)] underline-offset-4 hover:underline"
+              className="inline-flex items-center gap-2 text-sm text-[color:var(--accent)] underline-offset-4 hover:underline"
             >
-              Ouvrir la source officielle
+              Ouvrir la fiche officielle
+              <ExternalLink className="h-4 w-4" />
             </a>
+            {program.sourceLandingUrl && program.sourceLandingUrl !== program.officialUrl ? (
+              <a
+                href={program.sourceLandingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-black/72 underline-offset-4 hover:underline"
+              >
+                Ouvrir la page source
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            ) : null}
           </div>
         </div>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
         <div className="space-y-6">
+          <Card>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Apercu detaille</p>
+            <div className="mt-5 grid gap-5 md:grid-cols-1">
+              <div className="rounded-[24px] border border-black/10 p-5">
+                <p className="text-sm font-medium">Description et contexte</p>
+                <p className="mt-2 text-sm leading-7 text-black/66">
+                  {program.details ?? "Aucune information detaillee n'a encore ete extraite pour ce programme."}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-black/10 p-5">
+                <p className="text-sm font-medium">Notes d&apos;admissibilite</p>
+                <p className="mt-2 text-sm leading-7 text-black/66">
+                  {program.eligibilityNotes ?? "A confirmer sur la fiche officielle du programme."}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-black/10 p-5">
+                <p className="text-sm font-medium">Notes de depot</p>
+                <p className="mt-2 text-sm leading-7 text-black/66">
+                  {program.applicationNotes ?? "Verifier la page officielle pour les formulaires, dates et pieces a joindre."}
+                </p>
+              </div>
+            </div>
+          </Card>
+
           <Card>
             <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Admissibilite structuree</p>
             <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -199,6 +241,9 @@ export default async function ProgrammeDetailPage({
               </p>
               <p>
                 <span className="font-medium text-black">Cadence:</span> {program.source?.cadence ?? "A confirmer"}
+              </p>
+              <p>
+                <span className="font-medium text-black">Lien direct programme:</span> {program.officialUrl}
               </p>
             </div>
           </Card>

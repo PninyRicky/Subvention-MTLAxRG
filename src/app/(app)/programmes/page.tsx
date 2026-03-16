@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { MatchStatus, ProgramStatus, Prisma } from "@prisma/client";
+import { ExternalLink } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
@@ -12,6 +14,7 @@ type SearchParams = Promise<{
   status?: string;
   q?: string;
   level?: string;
+  favorites?: string;
 }>;
 
 export default async function ProgrammesPage({
@@ -29,6 +32,7 @@ export default async function ProgrammesPage({
   const programs = await prisma.fundingProgram.findMany({
     where: {
       ...(status ? { status } : {}),
+      ...(params.favorites === "1" ? { isFavorite: true } : {}),
       ...(params.level ? { governmentLevel: params.level } : {}),
       ...(query
         ? {
@@ -72,6 +76,7 @@ export default async function ProgrammesPage({
       },
     },
     orderBy: [
+      { isFavorite: "desc" },
       { status: "asc" },
       { updatedAt: "desc" },
     ],
@@ -89,7 +94,7 @@ export default async function ProgrammesPage({
             </p>
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-[1.6fr_0.8fr_0.8fr_auto]">
+          <form className="grid gap-3 sm:grid-cols-[1.45fr_0.8fr_0.8fr_0.8fr_auto]">
             <input
               type="search"
               name="q"
@@ -118,6 +123,14 @@ export default async function ProgrammesPage({
               <option value="Municipal">Municipal</option>
               <option value="Canada">Canada</option>
             </select>
+            <select
+              name="favorites"
+              defaultValue={params.favorites ?? ""}
+              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
+            >
+              <option value="">Tous</option>
+              <option value="1">Favoris seulement</option>
+            </select>
             <button className="h-11 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-[color:var(--accent)]">
               Filtrer
             </button>
@@ -135,6 +148,7 @@ export default async function ProgrammesPage({
                 <th className="px-6 py-4 font-medium">Niveau</th>
                 <th className="px-6 py-4 font-medium">Date limite</th>
                 <th className="px-6 py-4 font-medium">Meilleur match</th>
+                <th className="px-6 py-4 font-medium">Source</th>
                 <th className="px-6 py-4 font-medium">Mise a jour</th>
               </tr>
             </thead>
@@ -151,11 +165,18 @@ export default async function ProgrammesPage({
                 return (
                   <tr key={program.id} className="border-b border-black/10 align-top last:border-b-0">
                     <td className="px-6 py-5">
-                      <Link href={`/programmes/${program.id}`} className="block space-y-2">
-                        <p className="text-base font-medium">{program.name}</p>
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <Link href={`/programmes/${program.id}`} className="block space-y-2">
+                            <p className="text-base font-medium">{program.name}</p>
+                          </Link>
+                          <FavoriteToggleButton programId={program.id} isFavorite={program.isFavorite} compact />
+                        </div>
+                        <Link href={`/programmes/${program.id}`} className="block space-y-2">
                         <p className="text-sm text-black/60">{program.organization}</p>
                         <p className="max-w-xl text-sm leading-6 text-black/66">{program.summary}</p>
-                      </Link>
+                        </Link>
+                      </div>
                     </td>
                     <td className="px-6 py-5">
                       <Badge tone={tone}>{program.status}</Badge>
@@ -175,6 +196,17 @@ export default async function ProgrammesPage({
                       ) : (
                         <p className="text-sm text-black/44">Aucun match calcule</p>
                       )}
+                    </td>
+                    <td className="px-6 py-5">
+                      <a
+                        href={program.officialUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-[color:var(--accent)] underline-offset-4 hover:underline"
+                      >
+                        Lien direct
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
                     </td>
                     <td className="px-6 py-5 text-sm text-black/64">{formatDateTime(program.updatedAt)}</td>
                   </tr>

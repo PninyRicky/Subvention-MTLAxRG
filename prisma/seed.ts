@@ -84,10 +84,18 @@ async function main() {
         organization: "SODEC",
         summary:
           "Soutien pour le developpement et la structuration de projets audiovisuels au Quebec.",
+        officialUrl:
+          "https://sodec.gouv.qc.ca/wp-content/uploads/programme-aide-entreprise-soutien-developpement-audiovisuel.pdf",
         governmentLevel: "Quebec",
         region: "Quebec",
         status: "OPEN",
         confidence: 76,
+        details:
+          "Programme cible pour les entreprises audiovisuelles qui veulent financer les premieres etapes d'un projet: recherche, ecriture, structure, dossier et preproduction.",
+        eligibilityNotes:
+          "Vise surtout les entreprises et producteurs du secteur audiovisuel au Quebec. Les depenses admissibles touchent generalement le developpement du projet et la preparation du dossier.",
+        applicationNotes:
+          "Verifier l'appel en cours, les formulaires et le guide PDF de la SODEC avant depot. Le lien pointe directement vers la fiche programme detaillee.",
         applicantTypes: ["Entreprise", "Producteur"],
         sectors: ["audiovisuel", "production video"],
         projectStages: ["developpement"],
@@ -113,10 +121,17 @@ async function main() {
         organization: "Conseil des arts du Canada",
         summary:
           "Subvention pour le developpement, la creation et l'experimentation de projets artistiques.",
+        officialUrl: "https://conseildesarts.ca/financement/subventions/explorer-et-creer",
         governmentLevel: "Federal",
         region: "Canada",
         status: "REVIEW",
         confidence: 60,
+        details:
+          "Volet federal pertinent pour soutenir la recherche, la creation et le developpement d'oeuvres, avec plusieurs composantes selon le type de pratique artistique et d'organisme.",
+        eligibilityNotes:
+          "Peut convenir a certains organismes, collectifs ou artistes, mais il faut verifier la composante precise et la discipline admissible.",
+        applicationNotes:
+          "Le lien ouvre directement la page du programme Explorer et creer. Il faut ensuite choisir la bonne composante et la bonne date de depot.",
         applicantTypes: ["Artiste", "OBNL", "Collectif"],
         sectors: ["audiovisuel", "arts", "creation"],
         projectStages: ["developpement", "creation"],
@@ -142,10 +157,17 @@ async function main() {
         organization: "Programme a confirmer",
         summary:
           "Programme signale par agregateur pour modernisation numerique, site web, strategie et contenus.",
+        officialUrl: "https://hellodarwin.com/fr/subventions",
         governmentLevel: "Quebec",
         region: "Quebec",
         status: "REVIEW",
         confidence: 42,
+        details:
+          "Occasion detectee via agregateur pour des besoins de rayonnement et de modernisation numerique. Cette fiche doit etre confirmee sur une source gouvernementale ou officielle avant decision.",
+        eligibilityNotes:
+          "Le fit semble fort pour les OBNL ayant des besoins en contenu, site web ou rayonnement, mais l'admissibilite exacte reste a confirmer.",
+        applicationNotes:
+          "Comme il s'agit d'un agregateur, utiliser cette fiche comme piste de recherche et non comme preuve officielle d'ouverture.",
         applicantTypes: ["OBNL"],
         sectors: ["marketing numerique", "rayonnement", "branding"],
         projectStages: ["developpement", "diffusion"],
