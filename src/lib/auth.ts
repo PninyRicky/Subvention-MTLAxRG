@@ -93,18 +93,15 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user }) {
-      if (!user.email) {
-        return false;
-      }
+      return Boolean(user.email);
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      const userCount = await prisma.user.count();
 
-      const existing = await prisma.user.findUnique({
-        where: {
-          email: user.email,
-        },
-      });
-
-      if (existing) {
-        return true;
+      if (userCount !== 1) {
+        return;
       }
 
       await prisma.user.update({
@@ -115,8 +112,6 @@ export const authOptions: NextAuthOptions = {
           role: AppRole.ADMIN,
         },
       });
-
-      return true;
     },
   },
 };
