@@ -138,7 +138,7 @@ export default async function DashboardPage() {
             <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
               <li>Un programme n’est marque ouvert que si la source officielle le confirme.</li>
               <li>Les programmes detectes via agregateur restent en revision jusqu’a validation humaine.</li>
-              <li>Les scans automatiques tournent lundi, mercredi et vendredi a 06:00 Toronto.</li>
+              <li>Les scans automatiques tournent lundi, mercredi et vendredi une fois par jour sur Vercel Hobby.</li>
             </ul>
           </Card>
         </div>

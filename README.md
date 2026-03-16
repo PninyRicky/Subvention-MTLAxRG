@@ -13,7 +13,7 @@ L’app est construite avec `Next.js`, `TypeScript`, `Tailwind`, `Prisma`, `Post
 - catalogue de programmes avec filtres et detail
 - profils de matching modifiables
 - scans manuels depuis l’interface
-- scheduler Vercel lundi, mercredi et vendredi a 06:00 Toronto
+- scheduler Vercel lundi, mercredi et vendredi, une fois par jour
 - verification stricte: un programme n’est `OPEN` que si la source officielle le confirme
 
 ## Variables d’environnement
@@ -70,7 +70,7 @@ npm run db:seed
 
 ## Cron Vercel
 
-Le cron est defini dans `vercel.json` avec une double fenetre UTC pour couvrir l’heure locale Toronto en ete et en hiver. La route `/api/cron/fetch` filtre ensuite pour n’executer qu’un vrai scan a `06:00 America/Toronto`.
+Le cron est defini dans `vercel.json` avec une seule execution les lundis, mercredis et vendredis pour rester compatible avec le plan Hobby de Vercel. Sur Hobby, les cron jobs sont limites a une execution par jour et peuvent partir a n’importe quel moment dans l’heure planifiee. En pratique, le scan automatique se fera environ a `06:00` ou `07:00` Toronto selon la saison.
 
 ## Limites actuelles
 

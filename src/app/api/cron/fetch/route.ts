@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!isScheduledRunWindow()) {
     return NextResponse.json({
       skipped: true,
-      reason: "En dehors de la fenetre lundi/mercredi/vendredi 06:00 Toronto.",
+      reason: "En dehors des jours programmes lundi/mercredi/vendredi.",
     });
   }
 

@@ -1,11 +1,11 @@
-import { getTorontoLocalDateKey, getTorontoLocalHour, isMondayWednesdayFriday } from "@/lib/dates";
+import { getTorontoLocalDateKey, isMondayWednesdayFriday } from "@/lib/dates";
 
 export function isScheduledRunWindow(now = new Date()) {
-  return isMondayWednesdayFriday(now) && getTorontoLocalHour(now) === 6;
+  return isMondayWednesdayFriday(now);
 }
 
 export function getScheduleLabel() {
-  return "Lundi, mercredi et vendredi a 06:00 (America/Toronto)";
+  return "Lundi, mercredi et vendredi, une fois par jour sur Vercel Hobby (environ 06:00 ou 07:00 Toronto selon la saison)";
 }
 
 export function hasRunToday(date?: Date | null, now = new Date()) {
