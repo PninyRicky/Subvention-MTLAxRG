@@ -67,21 +67,25 @@ function uniqueOrganizations(items: OfficialOrganization[]) {
 }
 
 async function fetchOfficialText(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    signal: AbortSignal.timeout(6000),
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      signal: AbortSignal.timeout(6000),
+      next: {
+        revalidate: 60 * 60 * 24,
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Impossible de charger ${url} (${response.status}).`);
+    if (!response.ok) {
+      return "";
+    }
+
+    return response.text();
+  } catch {
+    return "";
   }
-
-  return response.text();
 }
 
 const getArtistCentres = unstable_cache(async () => {
@@ -177,58 +181,62 @@ const getSaguenayOrganizations = unstable_cache(async () => {
 });
 
 const extractOrganizationsFromSourcePage = unstable_cache(async (sourceUrl: string) => {
-  const response = await fetch(sourceUrl, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    signal: AbortSignal.timeout(3500),
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
-  });
+  try {
+    const response = await fetch(sourceUrl, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      signal: AbortSignal.timeout(3500),
+      next: {
+        revalidate: 60 * 60 * 24,
+      },
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return [] as OfficialOrganization[];
+    }
+
+    const html = await response.text();
+    const cheerio = await import("cheerio");
+    const $ = cheerio.load(html);
+    const sameHost = new URL(sourceUrl).hostname.replace(/^www\./, "");
+    const blockedText = /guide|formulaire|presentation|politique|communique|site internet|annonce|appel|fonds|programme|culture@mrc|conseill/i;
+    const blockedExtensions = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i;
+    const blockedHosts = /(^|\.)gouv\.qc\.ca$|(^|\.)quebec\.ca$|(^|\.)canada\.ca$/i;
+    const links = $("article a, .entry-content a, main a")
+      .map((_, element) => {
+        const anchor = $(element);
+        const text = anchor.text().replace(/\s+/g, " ").trim();
+        const href = anchor.attr("href")?.trim() ?? "";
+
+        if (!text || text.length < 3 || text.length > 90 || !href.startsWith("http")) {
+          return null;
+        }
+
+        if (blockedText.test(text) || blockedExtensions.test(href)) {
+          return null;
+        }
+
+        const linkHost = new URL(href).hostname.replace(/^www\./, "");
+
+        if (linkHost === sameHost || blockedHosts.test(linkHost) || linkHost.includes("facebook.com")) {
+          return null;
+        }
+
+        return {
+          id: `page-link-${territorySlug(text)}-${territorySlug(linkHost)}`,
+          name: text,
+          sourceLabel: `Répertoire issu de ${new URL(sourceUrl).hostname}`,
+          sourceUrl: href,
+        } satisfies OfficialOrganization;
+      })
+      .get()
+      .filter((item): item is OfficialOrganization => Boolean(item));
+
+    return uniqueOrganizations(links);
+  } catch {
     return [] as OfficialOrganization[];
   }
-
-  const html = await response.text();
-  const cheerio = await import("cheerio");
-  const $ = cheerio.load(html);
-  const sameHost = new URL(sourceUrl).hostname.replace(/^www\./, "");
-  const blockedText = /guide|formulaire|presentation|politique|communique|site internet|annonce|appel|fonds|programme|culture@mrc|conseill/i;
-  const blockedExtensions = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i;
-  const blockedHosts = /(^|\.)gouv\.qc\.ca$|(^|\.)quebec\.ca$|(^|\.)canada\.ca$/i;
-  const links = $("article a, .entry-content a, main a")
-    .map((_, element) => {
-      const anchor = $(element);
-      const text = anchor.text().replace(/\s+/g, " ").trim();
-      const href = anchor.attr("href")?.trim() ?? "";
-
-      if (!text || text.length < 3 || text.length > 90 || !href.startsWith("http")) {
-        return null;
-      }
-
-      if (blockedText.test(text) || blockedExtensions.test(href)) {
-        return null;
-      }
-
-      const linkHost = new URL(href).hostname.replace(/^www\./, "");
-
-      if (linkHost === sameHost || blockedHosts.test(linkHost) || linkHost.includes("facebook.com")) {
-        return null;
-      }
-
-      return {
-        id: `page-link-${territorySlug(text)}-${territorySlug(linkHost)}`,
-        name: text,
-        sourceLabel: `Répertoire issu de ${new URL(sourceUrl).hostname}`,
-        sourceUrl: href,
-      } satisfies OfficialOrganization;
-    })
-    .get()
-    .filter((item): item is OfficialOrganization => Boolean(item));
-
-  return uniqueOrganizations(links);
 }, ["official-organizations-source-page"], {
   revalidate: 60 * 60 * 24,
 });

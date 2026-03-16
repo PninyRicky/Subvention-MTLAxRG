@@ -4,6 +4,28 @@ import { Card } from "@/components/ui/card";
 import { getOfficialOrganizationsForTerritory } from "@/lib/official-organizations";
 import { getTerritoryDataForProgram, type TerritoryProgramInput } from "@/lib/territories";
 
+async function loadOrganizationDirectory({
+  programInput,
+  sourceName,
+  sourceUrl,
+}: {
+  programInput: TerritoryProgramInput;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+}) {
+  try {
+    const territory = await getTerritoryDataForProgram(programInput);
+    const organizationDirectory = await getOfficialOrganizationsForTerritory(territory, {
+      sourceName,
+      sourceUrl,
+    });
+
+    return { ok: true as const, organizationDirectory };
+  } catch {
+    return { ok: false as const };
+  }
+}
+
 export async function ProgramOrganizationsCard({
   programInput,
   sourceName,
@@ -13,11 +35,24 @@ export async function ProgramOrganizationsCard({
   sourceName?: string | null;
   sourceUrl?: string | null;
 }) {
-  const territory = await getTerritoryDataForProgram(programInput);
-  const organizationDirectory = await getOfficialOrganizationsForTerritory(territory, {
+  const result = await loadOrganizationDirectory({
+    programInput,
     sourceName,
     sourceUrl,
   });
+
+  if (!result.ok) {
+    return (
+      <Card>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Organismes repérés sur ce territoire</p>
+        <div className="mt-4 rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-4 py-6 text-sm leading-6 text-black/58">
+          Les répertoires externes n&apos;ont pas pu être chargés à temps. La fiche programme reste disponible.
+        </div>
+      </Card>
+    );
+  }
+
+  const { organizationDirectory } = result;
 
   return (
     <Card>
@@ -106,4 +141,3 @@ export async function ProgramOrganizationsCard({
     </Card>
   );
 }
-

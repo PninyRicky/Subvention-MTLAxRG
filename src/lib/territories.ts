@@ -142,21 +142,25 @@ function cleanMrcName(value: string) {
 }
 
 async function fetchOfficialText(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    signal: AbortSignal.timeout(6000),
-    next: {
-      revalidate: 60 * 60 * 24,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      signal: AbortSignal.timeout(6000),
+      next: {
+        revalidate: 60 * 60 * 24,
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Impossible de charger ${url} (${response.status}).`);
+    if (!response.ok) {
+      return "";
+    }
+
+    return response.text();
+  } catch {
+    return "";
   }
-
-  return response.text();
 }
 
 export const getMunicipalityDirectory = unstable_cache(async (): Promise<MunicipalityDirectoryEntry[]> => {
@@ -350,27 +354,31 @@ async function fetchTerritoryGeometry(
 
   for (const where of whereClauses) {
     const queryUrl = `${mernMapServerBase}/${config.layer}/query?where=${encodeURIComponent(where)}&outFields=*&returnGeometry=true&f=geojson`;
-    const response = await fetch(queryUrl, {
-      headers: {
-        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-      },
-      signal: AbortSignal.timeout(4000),
-      next: {
-        revalidate: 60 * 60 * 24 * 7,
-      },
-    });
+    try {
+      const response = await fetch(queryUrl, {
+        headers: {
+          "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+        },
+        signal: AbortSignal.timeout(4000),
+        next: {
+          revalidate: 60 * 60 * 24 * 7,
+        },
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = (await response.json()) as {
+        features?: ArcGisFeature[];
+      };
+      const geometry = payload.features?.[0]?.geometry ?? null;
+
+      if (geometry) {
+        return geometry;
+      }
+    } catch {
       continue;
-    }
-
-    const payload = (await response.json()) as {
-      features?: ArcGisFeature[];
-    };
-    const geometry = payload.features?.[0]?.geometry ?? null;
-
-    if (geometry) {
-      return geometry;
     }
   }
 
@@ -405,29 +413,33 @@ function mergeAsMultiPolygon(features: TerritoryGeometry[]) {
 
 const getQuebecProvinceGeometry = unstable_cache(async () => {
   const queryUrl = `${mernMapServerBase}/0/query?where=${encodeURIComponent("1=1")}&outFields=RES_NM_REG&returnGeometry=true&f=geojson`;
-  const response = await fetch(queryUrl, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    signal: AbortSignal.timeout(4000),
-    next: {
-      revalidate: 60 * 60 * 24 * 7,
-    },
-  });
+  try {
+    const response = await fetch(queryUrl, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      signal: AbortSignal.timeout(4000),
+      next: {
+        revalidate: 60 * 60 * 24 * 7,
+      },
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      features?: ArcGisFeature[];
+    };
+
+    return mergeAsMultiPolygon(
+      (payload.features ?? [])
+        .map((feature) => feature.geometry)
+        .filter((feature): feature is TerritoryGeometry => Boolean(feature)),
+    );
+  } catch {
     return null;
   }
-
-  const payload = (await response.json()) as {
-    features?: ArcGisFeature[];
-  };
-
-  return mergeAsMultiPolygon(
-    (payload.features ?? [])
-      .map((feature) => feature.geometry)
-      .filter((feature): feature is TerritoryGeometry => Boolean(feature)),
-  );
 }, ["territories-quebec-province-geometry"], {
   revalidate: 60 * 60 * 24 * 7,
 });
@@ -486,42 +498,46 @@ async function getMunicipalityGeometriesForTerritory(
   }
 
   const queryUrl = `${mernMapServerBase}/2/query?where=${encodeURIComponent(where)}&outFields=MUS_NM_MUN&returnGeometry=true&f=geojson`;
-  const response = await fetch(queryUrl, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    signal: AbortSignal.timeout(4000),
-    next: {
-      revalidate: 60 * 60 * 24 * 7,
-    },
-  });
+  try {
+    const response = await fetch(queryUrl, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      signal: AbortSignal.timeout(4000),
+      next: {
+        revalidate: 60 * 60 * 24 * 7,
+      },
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return [];
+    }
+
+    const payload = (await response.json()) as {
+      features?: ArcGisFeature[];
+    };
+
+    return (payload.features ?? [])
+      .flatMap((feature) => {
+        const geometry = feature.geometry;
+        const name = feature.properties?.MUS_NM_MUN;
+
+        if (!geometry || !name) {
+          return [];
+        }
+
+        return [
+          {
+            name,
+            geometry,
+            center: getGeometryCenter(geometry),
+          },
+        ];
+      })
+      .sort((left, right) => left.name.localeCompare(right.name, "fr"));
+  } catch {
     return [];
   }
-
-  const payload = (await response.json()) as {
-    features?: ArcGisFeature[];
-  };
-
-  return (payload.features ?? [])
-    .flatMap((feature) => {
-      const geometry = feature.geometry;
-      const name = feature.properties?.MUS_NM_MUN;
-
-      if (!geometry || !name) {
-        return [];
-      }
-
-      return [
-        {
-          name,
-          geometry,
-          center: getGeometryCenter(geometry),
-        },
-      ];
-    })
-    .sort((left, right) => left.name.localeCompare(right.name, "fr"));
 }
 
 export const getTerritoryDataForProgram = cache(async (program: TerritoryProgramInput) => {

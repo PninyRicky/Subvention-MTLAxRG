@@ -2,12 +2,35 @@ import { SafeTerritoryMap } from "@/components/territory-map-boundary";
 import { Card } from "@/components/ui/card";
 import { getTerritoryDataForProgram, type TerritoryProgramInput } from "@/lib/territories";
 
+async function loadTerritory(programInput: TerritoryProgramInput) {
+  try {
+    const territory = await getTerritoryDataForProgram(programInput);
+    return { ok: true as const, territory };
+  } catch {
+    return { ok: false as const };
+  }
+}
+
 export async function ProgramTerritoryCard({
   programInput,
 }: {
   programInput: TerritoryProgramInput;
 }) {
-  const territory = await getTerritoryDataForProgram(programInput);
+  const result = await loadTerritory(programInput);
+
+  if (!result.ok) {
+    return (
+      <Card>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Territoire admissible</p>
+        <div className="mt-4 rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-4 py-6 text-sm leading-6 text-black/58">
+          Les données territoriales officielles n&apos;ont pas pu être chargées à temps. Le reste de la fiche reste
+          utilisable.
+        </div>
+      </Card>
+    );
+  }
+
+  const { territory } = result;
 
   return (
     <Card>
@@ -55,4 +78,3 @@ export async function ProgramTerritoryCard({
     </Card>
   );
 }
-
