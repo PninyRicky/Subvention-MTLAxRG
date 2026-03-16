@@ -93,6 +93,14 @@ function getStatusFromText(text: string, sourceType: SourceType, candidateCloseD
     normalized.includes("ferme") ||
     normalized.includes("fermé") ||
     normalized.includes("closed") ||
+    normalized.includes("periode de depot s'est terminee") ||
+    normalized.includes("periode de depot s’est terminee") ||
+    normalized.includes("période de dépôt s'est terminée") ||
+    normalized.includes("période de dépôt s’est terminée") ||
+    normalized.includes("s'est terminee le") ||
+    normalized.includes("s’est terminee le") ||
+    normalized.includes("s'est terminée le") ||
+    normalized.includes("s’est terminée le") ||
     normalized.includes("date limite depassee") ||
     normalized.includes("date limite dépassée") ||
     normalized.includes("complet") ||

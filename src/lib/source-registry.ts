@@ -654,14 +654,14 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/aide-au-fonctionnement-pour-les-organismes-culturels-daction-communautaire",
       governmentLevel: "Quebec",
       region: "Quebec",
-      status: "REVIEW",
-      confidence: 78,
+      status: "CLOSED",
+      confidence: 90,
       details:
-        "Programme particulièrement pertinent pour des OBNL culturels ou communautaires qui misent sur l’accessibilité, la médiation, la participation et le rayonnement auprès de publics ciblés.",
+        "Programme particulièrement pertinent pour des OBNL culturels ou communautaires qui misent sur l’accessibilité, la médiation, la participation et le rayonnement auprès de publics ciblés. La page officielle indique que la période de dépôt s’est terminée le 27 juin 2025.",
       eligibilityNotes:
         "Convient aux organismes culturels d’action communautaire. Peut mieux cadrer avec des livrables de contenu, narration, image de marque et diffusion lorsqu’ils s’inscrivent dans l’offre de services et la participation culturelle de l’organisme.",
       applicationNotes:
-        "Le scan doit confirmer la fenêtre de dépôt active et toute mise à jour du programme sur Québec.ca.",
+        "Au 16 mars 2026, ce programme doit être considéré fermé tant qu’une nouvelle période de dépôt n’est pas publiée officiellement sur Québec.ca.",
       applicantTypes: ["OBNL", "Organisme culturel", "Organisme communautaire"],
       sectors: ["culture", "participation culturelle", "mediation", "rayonnement"],
       projectStages: ["developpement", "diffusion"],
@@ -669,7 +669,11 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       maxAmount: "Selon le programme",
       maxCoveragePct: null,
       openStatusReason:
-        "La page officielle confirme le programme, mais la période de dépôt active doit être revalidée lors de chaque scan.",
+        "La page officielle Québec.ca indique explicitement que la période de dépôt s’est terminée le 27 juin 2025; le programme est fermé au 16 mars 2026.",
+      intakeWindow: {
+        rolling: false,
+        closesAt: "2025-06-27T23:59:00.000Z",
+      },
     },
   },
   {

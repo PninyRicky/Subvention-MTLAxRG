@@ -131,7 +131,13 @@ export function parseRelevantFrenchDeadlineFromText(text: string) {
   const keywordMatchers = [
     /date limite[^.]{0,140}/g,
     /date de depot[^.]{0,140}/g,
+    /date de dépôt[^.]{0,140}/g,
     /depot des demandes[^.]{0,140}/g,
+    /dépôt des demandes[^.]{0,140}/g,
+    /periode de depot[^.]{0,180}/g,
+    /période de dépôt[^.]{0,180}/g,
+    /s['’]est terminee le[^.]{0,140}/g,
+    /s['’]est terminée le[^.]{0,140}/g,
     /soumettre une demande[^.]{0,140}/g,
     /jusqu[’']au[^.]{0,140}/g,
     /cloture[^.]{0,140}/g,
