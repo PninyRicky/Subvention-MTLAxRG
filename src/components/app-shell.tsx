@@ -41,7 +41,7 @@ export function AppShell({
   userLabel: string;
   action?: React.ReactNode;
   institutionLinks?: { slug: string; label: string; count: number; href: string }[];
-  mrcLinks?: { slug: string; name: string; count: number; href: string }[];
+  mrcLinks?: { slug: string; name: string; count: number; href: string; regionName: string }[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -134,28 +134,44 @@ export function AppShell({
                             <span className="uppercase tracking-[0.16em]">MRC</span>
                           </Link>
 
-                          <div className="space-y-1">
-                            {mrcLinks.map((mrc) => {
-                              const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
+                          <div className="space-y-2">
+                            {Object.entries(
+                              mrcLinks.reduce<Record<string, typeof mrcLinks>>((groups, mrc) => {
+                                const bucket = groups[mrc.regionName] ?? [];
+                                bucket.push(mrc);
+                                groups[mrc.regionName] = bucket;
+                                return groups;
+                              }, {}),
+                            )
+                              .sort(([left], [right]) => left.localeCompare(right, "fr"))
+                              .map(([regionName, entries]) => (
+                                <div key={regionName} className="space-y-1">
+                                  <p className="px-3 pt-1 text-[10px] uppercase tracking-[0.18em] text-black/38">
+                                    {regionName}
+                                  </p>
+                                  {entries.map((mrc) => {
+                                    const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
 
-                              return (
-                                <Link
-                                  key={mrc.slug}
-                                  href={mrc.href}
-                                  className={cn(
-                                    "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                    activeMrc
-                                      ? "bg-black/[0.06] text-black"
-                                      : "text-black/60 hover:bg-black/[0.03] hover:text-black",
-                                  )}
-                                >
-                                  <span className="truncate">{mrc.name}</span>
-                                  <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                    {mrc.count}
-                                  </span>
-                                </Link>
-                              );
-                            })}
+                                    return (
+                                      <Link
+                                        key={mrc.slug}
+                                        href={mrc.href}
+                                        className={cn(
+                                          "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                          activeMrc
+                                            ? "bg-black/[0.06] text-black"
+                                            : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                        )}
+                                      >
+                                        <span className="truncate">{mrc.name}</span>
+                                        <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                          {mrc.count}
+                                        </span>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              ))}
                           </div>
                         </div>
                       ) : null}

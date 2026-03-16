@@ -260,6 +260,16 @@ export default async function ProgrammeDetailPage({
               <div className="rounded-[24px] border border-black/10 p-4">
                 <p className="text-sm font-medium text-black">{territory.label}</p>
                 <p className="mt-2 text-sm leading-6 text-black/64">{territory.coverageLabel}</p>
+                {territory.regionName ? (
+                  <p className="mt-2 text-sm leading-6 text-black/64">
+                    <span className="font-medium text-black">Région administrative:</span> {territory.regionName}
+                  </p>
+                ) : null}
+                {territory.territoryCode ? (
+                  <p className="text-sm leading-6 text-black/64">
+                    <span className="font-medium text-black">Code officiel:</span> {territory.territoryCode}
+                  </p>
+                ) : null}
               </div>
 
               <SafeTerritoryMap territory={territory} />

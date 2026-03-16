@@ -55,6 +55,7 @@ export type TerritoryData = {
   label: string;
   municipalities: string[];
   regionName?: string;
+  territoryCode?: string;
   geometry: TerritoryGeometry | null;
   provinceGeometry: TerritoryGeometry | null;
   municipalityGeometries: {
@@ -95,6 +96,12 @@ type MrcDirectoryEntry = {
   code?: string;
   normalizedName: string;
   normalizedRegionName: string;
+};
+
+export type RegionDirectoryEntry = {
+  name: string;
+  normalizedName: string;
+  mrcCount: number;
 };
 
 type ArcGisFeature = {
@@ -203,6 +210,29 @@ export const getMrcDirectory = cache(async (): Promise<MrcDirectoryEntry[]> => {
   });
 });
 
+export const getRegionDirectory = cache(async (): Promise<RegionDirectoryEntry[]> => {
+  const mrcDirectory = await getMrcDirectory();
+  const regions = new Map<string, RegionDirectoryEntry>();
+
+  for (const entry of mrcDirectory) {
+    const key = entry.normalizedRegionName;
+    const current = regions.get(key);
+
+    if (current) {
+      current.mrcCount += 1;
+      continue;
+    }
+
+    regions.set(key, {
+      name: entry.regionName,
+      normalizedName: key,
+      mrcCount: 1,
+    });
+  }
+
+  return [...regions.values()].sort((left, right) => left.name.localeCompare(right.name, "fr"));
+});
+
 function buildHaystack(program: TerritoryProgramInput) {
   return normalizeTerritoryText(
     [
@@ -231,7 +261,7 @@ function inferMunicipality(program: TerritoryProgramInput) {
   return null;
 }
 
-function inferRegion(program: TerritoryProgramInput) {
+async function inferRegion(program: TerritoryProgramInput) {
   const haystack = buildHaystack(program);
 
   for (const [candidate, resolved] of Object.entries(regionAliases)) {
@@ -240,19 +270,29 @@ function inferRegion(program: TerritoryProgramInput) {
     }
   }
 
+  const regionDirectory = await getRegionDirectory();
+  const matched = regionDirectory.find((entry) => haystack.includes(entry.normalizedName));
+
+  if (matched) {
+    return matched.name;
+  }
+
   return null;
 }
 
 async function inferMrc(program: TerritoryProgramInput) {
   const haystack = buildHaystack(program);
+  const mrcDirectory = await getMrcDirectory();
 
   for (const [candidate, resolved] of Object.entries(mrcAliases)) {
     if (haystack.includes(candidate)) {
-      return resolved;
+      const aliasMatch = mrcDirectory.find((entry) => entry.name === resolved);
+
+      if (aliasMatch) {
+        return aliasMatch;
+      }
     }
   }
-
-  const mrcDirectory = await getMrcDirectory();
 
   const matched = mrcDirectory.find((entry) => {
     if (haystack.includes(entry.normalizedName)) {
@@ -270,7 +310,7 @@ async function inferMrc(program: TerritoryProgramInput) {
     return simplified.length > 7 && haystack.includes(simplified);
   });
 
-  return matched?.name ?? null;
+  return matched ?? null;
 }
 
 async function fetchTerritoryGeometry(
@@ -493,31 +533,31 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
     } satisfies TerritoryData;
   }
 
-  const mrcName = await inferMrc(program);
+  const mrcEntry = await inferMrc(program);
 
-  if (mrcName) {
-    const mrcDirectory = await getMrcDirectory();
-    const entry = mrcDirectory.find((item) => item.name === mrcName);
-    const municipalities = await getMunicipalitiesForMrc(mrcName);
-    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("mrc", mrcName, municipalities);
+  if (mrcEntry) {
+    const municipalities = await getMunicipalitiesForMrc(mrcEntry.name);
+    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("mrc", mrcEntry.name, municipalities);
 
     return {
       kind: "mrc",
-      name: mrcName,
-      label: `MRC ${mrcName}`,
-      regionName: entry?.regionName,
+      name: mrcEntry.name,
+      label: `MRC ${mrcEntry.name}`,
+      regionName: mrcEntry.regionName,
+      territoryCode: mrcEntry.code,
       municipalities,
-      geometry: await fetchTerritoryGeometry("mrc", mrcName, { code: entry?.code }),
+      geometry: await fetchTerritoryGeometry("mrc", mrcEntry.name, { code: mrcEntry.code }),
       provinceGeometry,
       municipalityGeometries,
       notes: [
         "Le contour provient du service cartographique officiel du gouvernement du Québec.",
+        `Région administrative officielle: ${mrcEntry.regionName}.`,
       ],
       coverageLabel: "Territoire MRC détecté",
     } satisfies TerritoryData;
   }
 
-  const regionName = inferRegion(program);
+  const regionName = await inferRegion(program);
 
   if (regionName) {
     const municipalities = await getMunicipalitiesForRegion(regionName);
@@ -527,6 +567,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       kind: "region",
       name: regionName,
       label: `Région ${regionName}`,
+      territoryCode: undefined,
       municipalities,
       geometry: await fetchTerritoryGeometry("region", regionName),
       provinceGeometry,

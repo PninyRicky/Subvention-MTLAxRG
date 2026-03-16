@@ -28,6 +28,7 @@ export type MrcNavLink = {
   name: string;
   count: number;
   href: string;
+  regionName: string;
 };
 
 function simplifyMrcText(value: string) {
@@ -148,5 +149,6 @@ export const getMrcNavLinks = cache(async (): Promise<MrcNavLink[]> => {
     name: group.name,
     count: group.programCount,
     href: `/mrcs?mrc=${group.slug}`,
+    regionName: group.regionName,
   }));
 });
