@@ -4,7 +4,6 @@ import { MatchStatus } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 
 import { ProgramOrganizationsCard } from "@/components/program-organizations-card";
-import { ProgramTerritoryCard } from "@/components/program-territory-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
@@ -37,17 +36,6 @@ export default async function ProgrammeDetailPage({
   if (!program) {
     notFound();
   }
-
-  const programInput = {
-    name: program.name,
-    organization: program.organization,
-    region: program.region,
-    governmentLevel: program.governmentLevel,
-    summary: program.summary,
-    details: program.details,
-    sourceName: program.source?.name,
-    sourceUrl: program.source?.url,
-  };
 
   const tone =
     program.status === "OPEN" ? "open" : program.status === "REVIEW" ? "review" : "closed";
@@ -247,13 +235,18 @@ export default async function ProgrammeDetailPage({
             </div>
           </Card>
 
-          <Suspense fallback={<ProgramSideCardSkeleton title="Territoire admissible" lines={5} />}>
-            <ProgramTerritoryCard programInput={programInput} />
-          </Suspense>
-
           <Suspense fallback={<ProgramSideCardSkeleton title="Organismes repérés sur ce territoire" lines={8} />}>
             <ProgramOrganizationsCard
-              programInput={programInput}
+              programInput={{
+                name: program.name,
+                organization: program.organization,
+                region: program.region,
+                governmentLevel: program.governmentLevel,
+                summary: program.summary,
+                details: program.details,
+                sourceName: program.source?.name,
+                sourceUrl: program.source?.url,
+              }}
               sourceName={program.source?.name}
               sourceUrl={program.source?.url}
             />

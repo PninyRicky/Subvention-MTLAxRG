@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
 
 :root {
   --background: #ffffff;
@@ -50,45 +49,4 @@ select {
 table {
   border-collapse: collapse;
   width: 100%;
-}
-
-.territory-map-canvas .leaflet-control-zoom a {
-  color: var(--foreground);
-  border-radius: 9999px;
-}
-
-.territory-map-canvas .leaflet-control-zoom {
-  border: 0;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-}
-
-.territory-map-canvas .leaflet-control-zoom a,
-.territory-map-canvas .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
-}
-
-.territory-map-city-label {
-  background: transparent;
-  border: 0;
-}
-
-.territory-map-city-label span {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.78);
-  color: rgba(17, 17, 17, 0.82);
-  font-family: var(--font-ibm-plex-mono), monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  white-space: nowrap;
-}
-
-.territory-map-canvas .leaflet-tooltip {
-  border-radius: 9999px;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-  color: rgba(17, 17, 17, 0.86);
 }

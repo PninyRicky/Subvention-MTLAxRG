@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ProgramStatus } from "@prisma/client";
-import { ArrowUpRight, Clock3, Radar, ShieldAlert } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { DashboardFilters } from "@/components/dashboard-filters";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ export default async function DashboardPage({
         : undefined,
   } as const;
 
-  const { latestRun, programs, profiles, stats } = await getDashboardData(filters);
+  const { programs, stats } = await getDashboardData(filters);
 
   return (
     <div className="space-y-6">
@@ -73,7 +73,7 @@ export default async function DashboardPage({
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <section>
         <Card>
           <DashboardFilters
             params={{
@@ -136,80 +136,6 @@ export default async function DashboardPage({
             })}
           </div>
         </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <div className="flex items-center gap-3">
-              <Clock3 className="h-4 w-4 text-[color:var(--accent)]" />
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Dernier scan</p>
-                <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">
-                {latestRun ? latestRun.status : "Aucun scan"}
-                </h2>
-              </div>
-            </div>
-
-            <dl className="mt-5 space-y-3 text-sm text-black/68">
-              <div className="flex items-center justify-between">
-                <dt>Mode</dt>
-                <dd>{latestRun?.mode ?? "Aucun"}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt>Dernier lancement</dt>
-                <dd>{formatDateTime(latestRun?.createdAt)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt>Sources parcourues</dt>
-                <dd>{latestRun?.sourceCount ?? 0}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt>Nouveaux programmes</dt>
-                <dd>{latestRun?.discoveredCount ?? 0}</dd>
-              </div>
-            </dl>
-          </Card>
-
-          <Card>
-            <div className="flex items-center gap-3">
-              <Radar className="h-4 w-4 text-[color:var(--accent)]" />
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Profils actifs</p>
-                <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">{profiles.length}</h2>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {profiles.map((profile) => (
-                <div key={profile.id} className="rounded-3xl border border-black/10 px-4 py-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">{profile.name}</p>
-                      <p className="mt-1 text-sm text-black/62">{profile.description}</p>
-                    </div>
-                    <Badge>{profile.active ? "Actif" : "Pause"}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="h-4 w-4 text-[color:var(--accent)]" />
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Notes</p>
-                <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">Cadre de vérification</h2>
-              </div>
-            </div>
-            <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
-              <li>Un programme n’est marqué ouvert que si la source officielle le confirme.</li>
-              <li>Les agrégateurs, chambres de commerce et plateformes tierces sont exclus du scan automatisé.</li>
-              <li>Le registre privilégie les sources officielles gouvernementales, municipales et régionales publiques.</li>
-              <li>Les cartes territoriales s&apos;appuient sur le service cartographique officiel du gouvernement du Québec.</li>
-              <li>Les scans automatiques tournent lundi, mercredi et vendredi une fois par jour sur Vercel Hobby.</li>
-            </ul>
-          </Card>
-        </div>
       </section>
     </div>
   );
