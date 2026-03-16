@@ -10,9 +10,12 @@ export async function POST() {
     return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   }
 
+  const initiatedById =
+    viewer.id === "dev-admin" || viewer.id === "shared-access" ? null : viewer.id;
+
   const run = await executeFetchRun({
     mode: ScanMode.MANUAL,
-    initiatedById: viewer.id === "dev-admin" ? null : viewer.id,
+    initiatedById,
   });
 
   return NextResponse.json(run, { status: 202 });
