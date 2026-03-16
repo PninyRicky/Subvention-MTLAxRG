@@ -47,50 +47,7 @@ export default async function MrcPage({
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Liste MRC</p>
-          <div className="mt-4 space-y-2">
-            {groups.length > 0 ? (
-              groups.map((group) => {
-                const active = selectedGroup?.slug === group.slug;
-
-                return (
-                  <Link
-                    key={group.slug}
-                    href={`/mrcs?mrc=${group.slug}`}
-                    className={`block rounded-[22px] border px-4 py-4 transition ${
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black hover:border-black/20 hover:bg-black/[0.02]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{group.name}</p>
-                        <p className={`mt-1 text-xs ${active ? "text-white/70" : "text-black/50"}`}>
-                          {group.regionName}
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.16em] ${
-                          active ? "bg-white/14 text-white" : "bg-black/[0.04] text-black/55"
-                        }`}
-                      >
-                        {group.programCount}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })
-            ) : (
-              <div className="rounded-[22px] border border-dashed border-black/12 bg-black/[0.02] px-4 py-6 text-sm leading-6 text-black/58">
-                Aucune MRC n&apos;est encore présente dans l&apos;application.
-              </div>
-            )}
-          </div>
-        </Card>
-
+      <div className="grid gap-6">
         <Card>
           {selectedGroup ? (
             <>
