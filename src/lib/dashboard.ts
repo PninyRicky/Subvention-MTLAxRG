@@ -1,10 +1,76 @@
-import { MatchStatus, ProgramStatus, ReviewStatus, ScanStatus } from "@prisma/client";
+import { MatchStatus, ProgramStatus, Prisma, ReviewStatus, ScanStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
-export async function getDashboardData() {
-  const [programs, reviewQueue, latestRun, profiles] = await Promise.all([
+export type DashboardFilters = {
+  status?: ProgramStatus;
+  region?: "montreal" | "quebec";
+  focus?: "cinema-creation" | "obnl-development";
+};
+
+function getDashboardProgramWhere(filters: DashboardFilters): Prisma.FundingProgramWhereInput {
+  const conditions: Prisma.FundingProgramWhereInput[] = [];
+
+  if (filters.status) {
+    conditions.push({ status: filters.status });
+  }
+
+  if (filters.region === "montreal") {
+    conditions.push({
+      OR: [
+        { region: { equals: "Montreal", mode: Prisma.QueryMode.insensitive } },
+        { organization: { contains: "Montreal", mode: Prisma.QueryMode.insensitive } },
+        { name: { contains: "Montreal", mode: Prisma.QueryMode.insensitive } },
+        { source: { is: { name: { contains: "Montreal", mode: Prisma.QueryMode.insensitive } } } },
+        { source: { is: { url: { contains: "montreal.ca" } } } },
+      ],
+    });
+  }
+
+  if (filters.region === "quebec") {
+    conditions.push({
+      OR: [
+        { region: { equals: "Capitale-Nationale", mode: Prisma.QueryMode.insensitive } },
+        { organization: { contains: "Ville de Quebec", mode: Prisma.QueryMode.insensitive } },
+        { name: { contains: "Ville de Quebec", mode: Prisma.QueryMode.insensitive } },
+        { source: { is: { name: { contains: "Ville de Quebec", mode: Prisma.QueryMode.insensitive } } } },
+        { source: { is: { url: { contains: "ville.quebec.qc.ca" } } } },
+      ],
+    });
+  }
+
+  if (filters.focus === "cinema-creation") {
+    conditions.push({
+      OR: [
+        { sectors: { hasSome: ["audiovisuel", "cinema", "production video", "arts", "creation"] } },
+        { name: { contains: "cinema", mode: Prisma.QueryMode.insensitive } },
+        { name: { contains: "culture", mode: Prisma.QueryMode.insensitive } },
+        { summary: { contains: "audiovisuel", mode: Prisma.QueryMode.insensitive } },
+        { summary: { contains: "creation", mode: Prisma.QueryMode.insensitive } },
+      ],
+    });
+  }
+
+  if (filters.focus === "obnl-development") {
+    conditions.push({
+      OR: [
+        { applicantTypes: { hasSome: ["OBNL", "Organisme communautaire", "Organisme culturel", "Cooperative"] } },
+        { eligibleExpenses: { hasSome: ["branding", "marketing", "site web", "rayonnement", "communications"] } },
+        { summary: { contains: "organisme", mode: Prisma.QueryMode.insensitive } },
+        { summary: { contains: "obnl", mode: Prisma.QueryMode.insensitive } },
+      ],
+    });
+  }
+
+  return conditions.length > 0 ? { AND: conditions } : {};
+}
+
+export async function getDashboardData(filters: DashboardFilters = {}) {
+  const programWhere = getDashboardProgramWhere(filters);
+
+  const [programs, reviewQueue, latestRun, profiles, openPrograms, reviewPrograms, eligibleMatches] = await Promise.all([
     prisma.fundingProgram.findMany({
+      where: programWhere,
       include: {
         intakeWindows: true,
         matchResults: {
@@ -44,18 +110,34 @@ export async function getDashboardData() {
         matches: true,
       },
     }),
+    prisma.fundingProgram.count({
+      where: {
+        status: ProgramStatus.OPEN,
+      },
+    }),
+    prisma.fundingProgram.count({
+      where: {
+        status: ProgramStatus.REVIEW,
+      },
+    }),
+    prisma.matchResult.count({
+      where: {
+        status: MatchStatus.ELIGIBLE,
+      },
+    }),
   ]);
 
   const stats = {
-    openPrograms: programs.filter((program) => program.status === ProgramStatus.OPEN).length,
-    reviewPrograms: programs.filter((program) => program.status === ProgramStatus.REVIEW).length,
-    eligibleMatches: programs.flatMap((program) => program.matchResults).filter((result) => result.status === MatchStatus.ELIGIBLE).length,
+    openPrograms,
+    reviewPrograms,
+    eligibleMatches,
     reviewQueue,
     activeProfiles: profiles.filter((profile) => profile.active).length,
     runningScan: latestRun?.status === ScanStatus.RUNNING,
   };
 
   return {
+    filters,
     programs,
     reviewQueue,
     latestRun,

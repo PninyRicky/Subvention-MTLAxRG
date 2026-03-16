@@ -90,7 +90,7 @@ export default async function ProgrammesPage({
             <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Catalogue</p>
             <h1 className="mt-2 text-4xl font-medium tracking-[-0.07em]">Programmes</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-black/66">
-              Vue detaillee des programmes detectes, avec filtres rapides, score par profil et statut d’ouverture.
+              Vue détaillée des programmes détectés, avec filtres rapides, score par profil et statut d’ouverture.
             </p>
           </div>
 
@@ -109,7 +109,7 @@ export default async function ProgrammesPage({
             >
               <option value="">Tous les statuts</option>
               <option value="OPEN">Ouverts</option>
-              <option value="REVIEW">A verifier</option>
+              <option value="REVIEW">À vérifier</option>
               <option value="CLOSED">Fermes</option>
             </select>
             <select
@@ -118,7 +118,7 @@ export default async function ProgrammesPage({
               className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
             >
               <option value="">Tous les niveaux</option>
-              <option value="Quebec">Quebec</option>
+              <option value="Quebec">Québec</option>
               <option value="Federal">Federal</option>
               <option value="Municipal">Municipal</option>
               <option value="Canada">Canada</option>
@@ -194,7 +194,7 @@ export default async function ProgrammesPage({
                           <p className="text-sm text-black/64">Score {topMatch.score}</p>
                         </div>
                       ) : (
-                        <p className="text-sm text-black/44">Aucun match calcule</p>
+                        <p className="text-sm text-black/44">Aucun match calculé</p>
                       )}
                     </td>
                     <td className="px-6 py-5">

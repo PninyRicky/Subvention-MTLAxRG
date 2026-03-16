@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProgramStatus } from "@prisma/client";
 import { ArrowUpRight, Clock3, Radar, ShieldAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -6,24 +7,144 @@ import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { formatDateTime } from "@/lib/dates";
 import { getDashboardData } from "@/lib/dashboard";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const { latestRun, programs, profiles, stats } = await getDashboardData();
+type SearchParams = Promise<{
+  status?: string;
+  region?: string;
+  focus?: string;
+}>;
+
+function buildFilterHref(
+  params: { status?: string; region?: string; focus?: string },
+  key: "status" | "region" | "focus",
+  value: string,
+) {
+  const search = new URLSearchParams();
+  const nextParams = {
+    status: params.status,
+    region: params.region,
+    focus: params.focus,
+  };
+
+  nextParams[key] = nextParams[key] === value ? undefined : value;
+
+  Object.entries(nextParams).forEach(([entryKey, entryValue]) => {
+    if (entryValue) {
+      search.set(entryKey, entryValue);
+    }
+  });
+
+  const query = search.toString();
+  return query ? `/dashboard?${query}` : "/dashboard";
+}
+
+function FilterChip({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex h-10 items-center rounded-full border px-4 text-sm transition",
+        active
+          ? "border-black bg-black text-white"
+          : "border-black/10 bg-white text-black/72 hover:border-black hover:text-black",
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const filters = {
+    status:
+      params.status && Object.values(ProgramStatus).includes(params.status as ProgramStatus)
+        ? (params.status as ProgramStatus)
+        : undefined,
+    region:
+      params.region === "montreal" || params.region === "quebec" ? params.region : undefined,
+    focus:
+      params.focus === "cinema-creation" || params.focus === "obnl-development"
+        ? params.focus
+        : undefined,
+  } as const;
+
+  const { latestRun, programs, profiles, stats } = await getDashboardData(filters);
 
   return (
     <div className="space-y-6">
       <section className="grid gap-4 lg:grid-cols-5">
-        <StatCard label="Programmes ouverts" value={stats.openPrograms} hint="Programmes actuellement detectes comme ouverts aujourd'hui." />
-        <StatCard label="A verifier" value={stats.reviewPrograms} hint="Programmes ambigus ou signales sans validation definitive." />
-        <StatCard label="Matches eligibles" value={stats.eligibleMatches} hint="Associations fortes entre programmes et profils actifs." />
-        <StatCard label="File de revue" value={stats.reviewQueue} hint="Elements qui demandent une validation humaine avant usage." />
-        <StatCard label="Profils actifs" value={stats.activeProfiles} hint="Profils de selection actuellement pris en compte dans le score." />
+        <StatCard label="Programmes ouverts" value={stats.openPrograms} hint="Programmes actuellement détectés comme ouverts aujourd'hui." />
+        <StatCard label="À vérifier" value={stats.reviewPrograms} hint="Programmes ambigus ou signalés sans validation définitive." />
+        <StatCard label="Matches éligibles" value={stats.eligibleMatches} hint="Associations fortes entre programmes et profils actifs." />
+        <StatCard label="File de revue" value={stats.reviewQueue} hint="Éléments qui demandent une validation humaine avant usage." />
+        <StatCard label="Profils actifs" value={stats.activeProfiles} hint="Profils de sélection actuellement pris en compte dans le score." />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Card>
+          <div className="mb-5 space-y-4 border-b border-black/10 pb-5">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Filtres rapides</p>
+              <p className="mt-2 text-sm leading-6 text-black/62">
+                Affiche les programmes en vue selon l&apos;ouverture, la zone cible et la famille de besoins.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Statut</span>
+                <FilterChip href={buildFilterHref(params, "status", "OPEN")} active={filters.status === "OPEN"}>
+                  Ouverts
+                </FilterChip>
+                <FilterChip href={buildFilterHref(params, "status", "REVIEW")} active={filters.status === "REVIEW"}>
+                  À vérifier
+                </FilterChip>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Zone</span>
+                <FilterChip href={buildFilterHref(params, "region", "quebec")} active={filters.region === "quebec"}>
+                  Région de Québec
+                </FilterChip>
+                <FilterChip href={buildFilterHref(params, "region", "montreal")} active={filters.region === "montreal"}>
+                  Région de Montréal
+                </FilterChip>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Famille</span>
+                <FilterChip
+                  href={buildFilterHref(params, "focus", "cinema-creation")}
+                  active={filters.focus === "cinema-creation"}
+                >
+                  Cinéma et création culturelle
+                </FilterChip>
+                <FilterChip
+                  href={buildFilterHref(params, "focus", "obnl-development")}
+                  active={filters.focus === "obnl-development"}
+                >
+                  OBNL et développement des organismes
+                </FilterChip>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Priorites</p>
@@ -36,6 +157,13 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mt-6 space-y-4">
+            {programs.length === 0 ? (
+              <div className="rounded-[28px] border border-dashed border-black/12 px-5 py-8 text-sm leading-6 text-black/60">
+                Aucun programme ne correspond aux filtres actifs pour l&apos;instant. Essaie d&apos;enlever un filtre ou
+                relance un scan.
+              </div>
+            ) : null}
+
             {programs.map((program) => {
               const topMatch = program.matchResults[0];
               const tone =
@@ -61,8 +189,8 @@ export default async function DashboardPage() {
                     <div className="min-w-[220px] text-sm text-black/64">
                       <p className="font-medium text-black">Score: {topMatch?.score ?? 0}</p>
                       <p className="mt-1">Niveau: {program.governmentLevel}</p>
-                      <p className="mt-1">Region: {program.region}</p>
-                      <p className="mt-1">Derniere verification: {formatDateTime(program.lastVerifiedAt)}</p>
+                      <p className="mt-1">Région: {program.region}</p>
+                      <p className="mt-1">Dernière vérification: {formatDateTime(program.lastVerifiedAt)}</p>
                     </div>
                   </div>
                 </Link>
@@ -78,7 +206,7 @@ export default async function DashboardPage() {
               <div>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Dernier scan</p>
                 <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">
-                  {latestRun ? latestRun.status : "Aucun scan"}
+                {latestRun ? latestRun.status : "Aucun scan"}
                 </h2>
               </div>
             </div>
@@ -93,7 +221,7 @@ export default async function DashboardPage() {
                 <dd>{formatDateTime(latestRun?.createdAt)}</dd>
               </div>
               <div className="flex items-center justify-between">
-                <dt>Sources parcours</dt>
+                <dt>Sources parcourues</dt>
                 <dd>{latestRun?.sourceCount ?? 0}</dd>
               </div>
               <div className="flex items-center justify-between">
@@ -132,13 +260,14 @@ export default async function DashboardPage() {
               <ShieldAlert className="h-4 w-4 text-[color:var(--accent)]" />
               <div>
                 <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Notes</p>
-                <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">Cadre de verification</h2>
+                <h2 className="mt-2 text-2xl font-medium tracking-[-0.05em]">Cadre de vérification</h2>
               </div>
             </div>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
-              <li>Un programme n’est marque ouvert que si la source officielle le confirme.</li>
-              <li>Les agregateurs, chambres de commerce et plateformes tierces sont exclus du scan automatise.</li>
-              <li>Le registre privilegie les sources officielles gouvernementales, municipales et regionales publiques.</li>
+              <li>Un programme n’est marqué ouvert que si la source officielle le confirme.</li>
+              <li>Les agrégateurs, chambres de commerce et plateformes tierces sont exclus du scan automatisé.</li>
+              <li>Le registre privilégie les sources officielles gouvernementales, municipales et régionales publiques.</li>
+              <li>Les cartes territoriales s&apos;appuient sur le service cartographique officiel du gouvernement du Québec.</li>
               <li>Les scans automatiques tournent lundi, mercredi et vendredi une fois par jour sur Vercel Hobby.</li>
             </ul>
           </Card>
