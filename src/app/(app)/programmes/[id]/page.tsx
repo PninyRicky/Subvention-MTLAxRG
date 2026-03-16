@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { MatchStatus, ReviewStatus } from "@prisma/client";
+import { MatchStatus } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 
 import { TerritoryMap } from "@/components/territory-map";
@@ -30,11 +30,6 @@ export default async function ProgrammeDetailPage({
         },
         orderBy: {
           score: "desc",
-        },
-      },
-      reviews: {
-        orderBy: {
-          createdAt: "desc",
         },
       },
       source: true,
@@ -232,23 +227,6 @@ export default async function ProgrammeDetailPage({
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Historique de revue</p>
-            <div className="mt-5 space-y-3">
-              {program.reviews.map((review) => (
-                <div key={review.id} className="rounded-[24px] border border-black/10 p-4">
-                  <div className="flex items-center justify-between">
-                    <Badge tone={review.status === ReviewStatus.APPROVED ? "open" : review.status === ReviewStatus.REJECTED ? "closed" : "review"}>
-                      {review.status}
-                    </Badge>
-                    <p className="text-xs text-black/45">{formatDateTime(review.createdAt)}</p>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-black/66">{review.reason}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
           <Card>
             <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Source</p>
             <div className="mt-4 space-y-2 text-sm leading-6 text-black/66">

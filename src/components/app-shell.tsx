@@ -85,12 +85,6 @@ export function AppShell({
             })}
           </nav>
 
-          <div className="mt-10 rounded-[28px] border border-black/10 bg-[color:var(--accent-soft)] p-5">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--accent)]">Style MTLA</p>
-            <p className="mt-2 text-sm leading-6 text-black/72">
-              Interface editoriale noir sur blanc avec une accentuation minimale pour les actions importantes.
-            </p>
-          </div>
         </aside>
 
         <div className="flex min-h-screen flex-col gap-6">
