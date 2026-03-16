@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, FolderSearch2, Radar, ScanSearch } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BarChart3, FolderSearch2, MapPinned, Radar, ScanSearch } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -34,13 +34,16 @@ export function AppShell({
   children,
   userLabel,
   action,
+  mrcLinks = [],
 }: {
   children: React.ReactNode;
   userLabel: string;
   action?: React.ReactNode;
+  mrcLinks?: { slug: string; name: string; count: number; href: string }[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   async function handleLogout() {
     await fetch("/api/session/logout", {
@@ -70,21 +73,62 @@ export function AppShell({
               const Icon = item.icon;
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
-                    active ? "bg-black text-white" : "text-black/72 hover:bg-black/[0.04] hover:text-black",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </Link>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
+                      active ? "bg-black text-white" : "text-black/72 hover:bg-black/[0.04] hover:text-black",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+
+                  {item.href === "/programmes" && mrcLinks.length > 0 ? (
+                    <div className="ml-6 mt-2 border-l border-black/10 pl-3">
+                      <Link
+                        href="/mrcs"
+                        className={cn(
+                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs transition",
+                          pathname === "/mrcs"
+                            ? "bg-black/[0.06] text-black"
+                            : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                        )}
+                      >
+                        <MapPinned className="h-3.5 w-3.5" />
+                        <span className="uppercase tracking-[0.16em]">MRC</span>
+                      </Link>
+
+                      <div className="mt-1 space-y-1">
+                        {mrcLinks.map((mrc) => {
+                          const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
+
+                          return (
+                            <Link
+                              key={mrc.slug}
+                              href={mrc.href}
+                              className={cn(
+                                "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                activeMrc
+                                  ? "bg-black/[0.06] text-black"
+                                  : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                              )}
+                            >
+                              <span className="truncate">{mrc.name}</span>
+                              <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                {mrc.count}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </nav>
-
         </aside>
 
         <div className="flex min-h-screen flex-col gap-6">

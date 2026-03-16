@@ -241,7 +241,15 @@ export default async function ProgrammeDetailPage({
                 <span className="font-medium text-black">Cadence:</span> {program.source?.cadence ?? "À confirmer"}
               </p>
               <p>
-                <span className="font-medium text-black">Lien direct programme:</span> {program.officialUrl}
+                <span className="font-medium text-black">Lien direct programme:</span>{" "}
+                <a
+                  href={program.officialUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[color:var(--accent)] underline-offset-4 hover:underline"
+                >
+                  {program.officialUrl}
+                </a>
               </p>
             </div>
           </Card>
@@ -303,17 +311,28 @@ export default async function ProgrammeDetailPage({
                       <p>
                         <span className="font-medium text-black">Source:</span> {organization.sourceLabel}
                       </p>
-                      {organization.website ? (
+                      <div className="flex flex-wrap gap-3 pt-1">
                         <a
-                          href={organization.website}
+                          href={organization.website ?? organization.sourceUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-2 text-sm text-[color:var(--accent)] underline-offset-4 hover:underline"
                         >
-                          Site web
+                          {organization.website ? "Ouvrir l’organisme" : "Ouvrir la source"}
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                      ) : null}
+                        {organization.website && organization.sourceUrl !== organization.website ? (
+                          <a
+                            href={organization.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-black/72 underline-offset-4 hover:underline"
+                          >
+                            Source officielle
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : null}
+                      </div>
                       {organization.email ? (
                         <p>
                           <span className="font-medium text-black">Courriel:</span> {organization.email}

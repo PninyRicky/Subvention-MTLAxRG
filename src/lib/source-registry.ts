@@ -46,6 +46,26 @@ export type OfficialSourceSeed = {
   fallbackPayload: FallbackPayloadSeed;
 };
 
+type RegionalReviewSourceInput = {
+  name: string;
+  url: string;
+  organization: string;
+  region: string;
+  description: string;
+  summary: string;
+  details: string;
+  eligibilityNotes: string;
+  applicationNotes: string;
+  applicantTypes: string[];
+  sectors: string[];
+  projectStages: string[];
+  eligibleExpenses: string[];
+  maxAmount?: string | null;
+  maxCoveragePct?: number | null;
+  confidence?: number;
+  openStatusReason: string;
+};
+
 const officialHostMatchers = [
   /(^|\.)gouv\.qc\.ca$/i,
   /(^|\.)gc\.ca$/i,
@@ -75,6 +95,36 @@ const blockedThirdPartyHosts = new Set([
   "hellodarwin.com",
   "www.hellodarwin.com",
 ]);
+
+function buildRegionalReviewSource(input: RegionalReviewSourceInput): OfficialSourceSeed {
+  return {
+    name: input.name,
+    url: input.url,
+    type: "OFFICIAL",
+    governmentLevel: "Regional",
+    description: input.description,
+    fallbackPayload: {
+      name: input.name,
+      organization: input.organization,
+      summary: input.summary,
+      officialUrl: input.url,
+      governmentLevel: "Regional",
+      region: input.region,
+      status: "REVIEW",
+      confidence: input.confidence ?? 66,
+      details: input.details,
+      eligibilityNotes: input.eligibilityNotes,
+      applicationNotes: input.applicationNotes,
+      applicantTypes: input.applicantTypes,
+      sectors: input.sectors,
+      projectStages: input.projectStages,
+      eligibleExpenses: input.eligibleExpenses,
+      maxAmount: input.maxAmount ?? "Selon le programme",
+      maxCoveragePct: input.maxCoveragePct ?? null,
+      openStatusReason: input.openStatusReason,
+    },
+  };
+}
 
 export function isOfficialInstitutionUrl(candidate: string | null | undefined) {
   if (!candidate) {
@@ -531,4 +581,214 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       openStatusReason: "Source officielle regionale utile pour reperer des fonds publics, mais la date et le programme exacts doivent etre confirmes sur l'appel cible.",
     },
   },
+  buildRegionalReviewSource({
+    name: "MRC de Bécancour - Fonds culturels",
+    url: "https://www.mrcbecancour.qc.ca/fonds-culturels",
+    organization: "MRC de Bécancour",
+    region: "Centre-du-Québec",
+    description: "Page officielle des fonds culturels de la MRC de Bécancour.",
+    summary:
+      "Programme officiel de la MRC de Bécancour pour des projets culturels, patrimoniaux et de médiation sur le territoire.",
+    details:
+      "La page officielle de la MRC centralise ses fonds culturels et les appels associés pour organismes, municipalités et promoteurs locaux.",
+    eligibilityNotes:
+      "Pertinent pour des OBNL, organismes culturels, municipalités et partenaires actifs dans la MRC de Bécancour. L'admissibilité exacte dépend du fonds ou du volet affiché.",
+    applicationNotes:
+      "Toujours relire la page officielle pour confirmer l'appel en cours, les documents à joindre et la date limite de dépôt.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "médiation", "rayonnement"],
+    projectStages: ["développement", "production", "diffusion"],
+    eligibleExpenses: ["médiation", "animation culturelle", "patrimoine", "rayonnement"],
+    openStatusReason:
+      "Source officielle MRC détectée. Les fenêtres de dépôt et les montants doivent être confirmés sur la page active du fonds.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de La Vallée-de-la-Gatineau - Développement culturel",
+    url: "https://www.mrcvg.qc.ca/services/services-aux-citoyens/loisirs-et-sports/developpement-culturel/",
+    organization: "MRC de La Vallée-de-la-Gatineau",
+    region: "Outaouais",
+    description: "Page officielle de développement culturel de la MRC de La Vallée-de-la-Gatineau.",
+    summary:
+      "Source officielle de la MRC de La Vallée-de-la-Gatineau pour les appels de projets culturels et les initiatives de rayonnement local.",
+    details:
+      "La page officielle regroupe les appels liés au développement culturel, aux ententes culturelles et à la mobilisation des organismes sur le territoire.",
+    eligibilityNotes:
+      "Vise surtout les organismes, municipalités et porteurs de projets culturels établis dans la MRC de La Vallée-de-la-Gatineau.",
+    applicationNotes:
+      "La page doit être revue à chaque scan pour confirmer le guide applicable, les volets admissibles et les échéances.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "médiation", "patrimoine", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["animation culturelle", "médiation", "patrimoine", "rayonnement"],
+    openStatusReason:
+      "Page MRC officielle orientée appels de projets. Le statut reste à confirmer tant que la date annuelle n'est pas explicitement détectée.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC Pontiac - Fonds culturel",
+    url: "https://mrcpontiac.qc.ca/entreprises/soutien-et-financement/fonds-culturel/",
+    organization: "MRC Pontiac",
+    region: "Outaouais",
+    description: "Fonds culturel officiel de la MRC Pontiac.",
+    summary:
+      "Programme officiel de soutien culturel de la MRC Pontiac pour projets artistiques, patrimoniaux et de développement territorial.",
+    details:
+      "La page officielle du Fonds culturel de la MRC Pontiac sert de point d'entrée vers les appels de projets et les modalités de dépôt du territoire.",
+    eligibilityNotes:
+      "Peut convenir aux OBNL, organismes culturels, municipalités et partenaires locaux du Pontiac selon le volet actif.",
+    applicationNotes:
+      "Le scan doit confirmer les dates de l'édition courante et la documentation officielle affichée sur la page MRC.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "rayonnement", "développement territorial"],
+    projectStages: ["développement", "production", "diffusion"],
+    eligibleExpenses: ["médiation", "patrimoine", "animation culturelle", "rayonnement"],
+    openStatusReason:
+      "Lien direct vers un fonds culturel officiel MRC. Les modalités sont publiques mais l'ouverture doit être confirmée selon l'édition courante.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de Portneuf - Fonds et programmes",
+    url: "https://portneuf.ca/developpement-economique/fonds/",
+    organization: "MRC de Portneuf",
+    region: "Capitale-Nationale",
+    description: "Portail officiel des fonds et programmes de la MRC de Portneuf.",
+    summary:
+      "Portail officiel de la MRC de Portneuf pour les fonds régionaux pouvant soutenir des organismes, initiatives collectives et projets culturels.",
+    details:
+      "Cette page centralise les fonds et programmes publics de la MRC, incluant des outils utiles pour des projets structurants, culturels ou de développement local.",
+    eligibilityNotes:
+      "Pertinent pour des organismes et initiatives implantés dans Portneuf. Le bon volet doit être confirmé selon le type de projet et le profil du demandeur.",
+    applicationNotes:
+      "La page agit comme portail d'entrée; il faut descendre au fonds officiel correspondant avant de conclure à une ouverture confirmée.",
+    applicantTypes: ["OBNL", "Organisme communautaire", "Municipalité", "Entreprise"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "rayonnement", "médiation", "communications"],
+    openStatusReason:
+      "Portail officiel de programmes MRC. Le volet exact et la date de dépôt doivent être validés avant qualification finale.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC du Granit - Culture",
+    url: "https://www.mrcgranit.qc.ca/fr/documents-et-publications/culture/",
+    organization: "MRC du Granit",
+    region: "Estrie",
+    description: "Section culture officielle de la MRC du Granit.",
+    summary:
+      "Page officielle de la MRC du Granit regroupant les outils et appels en culture, patrimoine et développement culturel.",
+    details:
+      "La section culture de la MRC du Granit sert de base officielle pour repérer les appels culturels et les documents du territoire.",
+    eligibilityNotes:
+      "Convient aux organismes culturels, OBNL et partenaires locaux actifs dans la MRC du Granit.",
+    applicationNotes:
+      "Le scan doit vérifier si un appel de projets ou un fonds de développement culturel est explicitement publié dans la section.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "médiation", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["médiation", "patrimoine", "animation culturelle", "rayonnement"],
+    openStatusReason:
+      "Section officielle MRC repérée. La page est valide, mais l'appel actif doit être confirmé avant de classer le programme comme ouvert.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC d'Abitibi - Fonds culturel",
+    url: "https://mrcabitibi.qc.ca/fr/services-aux-citoyens-et-aux-municipalites/fonds/fonds-culturel",
+    organization: "MRC d'Abitibi",
+    region: "Abitibi-Témiscamingue",
+    description: "Fonds culturel officiel de la MRC d'Abitibi.",
+    summary:
+      "Fonds culturel officiel de la MRC d'Abitibi pour soutenir des projets artistiques, culturels et patrimoniaux sur le territoire.",
+    details:
+      "La page officielle présente le fonds culturel MRC et les informations de référence utiles pour les promoteurs locaux.",
+    eligibilityNotes:
+      "S'adresse surtout aux organismes, municipalités et promoteurs culturels actifs dans la MRC d'Abitibi.",
+    applicationNotes:
+      "La confirmation finale dépend des documents de l'édition en cours et de la présence d'une date limite sur la page officielle.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "rayonnement", "médiation"],
+    projectStages: ["développement", "production", "diffusion"],
+    eligibleExpenses: ["médiation", "animation culturelle", "patrimoine", "communications"],
+    openStatusReason:
+      "Le fonds culturel est officiellement documenté par la MRC. L'ouverture actuelle doit être confirmée par la publication active.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de Drummond - Fonds et programmes",
+    url: "https://www.mrcdrummond.qc.ca/fonds-et-programmes/",
+    organization: "MRC de Drummond",
+    region: "Centre-du-Québec",
+    description: "Portail officiel des fonds et programmes de la MRC de Drummond.",
+    summary:
+      "Portail officiel des fonds et programmes de la MRC de Drummond, pertinent pour des projets collectifs, culturels et de développement des organismes.",
+    details:
+      "La page recense plusieurs leviers publics de la MRC de Drummond et peut orienter vers des appels en culture, initiatives structurantes et soutien local.",
+    eligibilityNotes:
+      "Pertinent pour des OBNL, organismes culturels, municipalités ou partenaires de la MRC selon le volet ciblé.",
+    applicationNotes:
+      "Le scan doit identifier le sous-programme officiel correspondant et confirmer sa date avant de qualifier le dossier comme ouvert.",
+    applicantTypes: ["OBNL", "Organisme communautaire", "Organisme culturel", "Municipalité"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "rayonnement", "médiation", "communications"],
+    openStatusReason:
+      "Portail officiel MRC bien identifié. L'admissibilité et la date dépendent du sous-programme réellement visé.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de La Haute-Côte-Nord - Fonds et programmes",
+    url: "https://www.mrchcn.qc.ca/fr/services-aux-citoyens/fonds-et-programmes/",
+    organization: "MRC de La Haute-Côte-Nord",
+    region: "Côte-Nord",
+    description: "Portail officiel des fonds et programmes de la MRC de La Haute-Côte-Nord.",
+    summary:
+      "Portail officiel regroupant les programmes et fonds de la MRC de La Haute-Côte-Nord pour des organismes, projets collectifs et initiatives culturelles.",
+    details:
+      "La page officielle réunit différents dispositifs MRC et sert de point de repérage pour les programmes territoriaux disponibles.",
+    eligibilityNotes:
+      "Utile pour des OBNL et organismes implantés sur le territoire, y compris des initiatives culturelles et structurantes.",
+    applicationNotes:
+      "La page portail doit être recoupée avec le sous-programme visé pour confirmer l'ouverture réelle et les exigences de dépôt.",
+    applicantTypes: ["OBNL", "Organisme communautaire", "Organisme culturel", "Municipalité"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "rayonnement", "médiation", "communications"],
+    openStatusReason:
+      "Portail officiel MRC actif. Le lien est valide, mais le programme admissible précis doit encore être confirmé.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC d'Argenteuil - Fonds et programmes",
+    url: "https://argenteuil.qc.ca/fonds-et-programmes/",
+    organization: "MRC d'Argenteuil",
+    region: "Laurentides",
+    description: "Portail officiel des fonds et programmes de la MRC d'Argenteuil.",
+    summary:
+      "Portail officiel de la MRC d'Argenteuil pour les fonds territoriaux, les initiatives structurantes et certains leviers utiles aux organismes.",
+    details:
+      "La page regroupe les programmes MRC et permet de repérer les outils de financement disponibles pour les projets collectifs et locaux.",
+    eligibilityNotes:
+      "Pertinent pour des organismes, OBNL, municipalités et promoteurs établis dans Argenteuil selon le fonds ou l'appel affiché.",
+    applicationNotes:
+      "Cette source doit être parcourue jusqu'au programme cible avant validation finale du statut et de la date de dépôt.",
+    applicantTypes: ["OBNL", "Organisme communautaire", "Municipalité", "Entreprise"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "rayonnement", "communications", "médiation"],
+    openStatusReason:
+      "Portail officiel Argenteuil repéré. La page doit être qualifiée plus finement programme par programme.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC d'Abitibi-Ouest - Projets culturels",
+    url: "https://developpement.mrcao.qc.ca/fr/programme-de-soutien-financier-aux-projets-culturels-de-l-abitibi-ouest",
+    organization: "MRC d'Abitibi-Ouest",
+    region: "Abitibi-Témiscamingue",
+    description: "Programme officiel de soutien aux projets culturels de la MRC d'Abitibi-Ouest.",
+    summary:
+      "Programme officiel de la MRC d'Abitibi-Ouest pour soutenir des projets culturels sur le territoire.",
+    details:
+      "La page programme décrit un soutien financier dédié aux projets culturels de l'Abitibi-Ouest avec une portée territoriale claire.",
+    eligibilityNotes:
+      "Convient à des organismes, OBNL, artistes ou partenaires locaux selon les conditions officielles du programme.",
+    applicationNotes:
+      "Le programme doit être revérifié à chaque scan pour confirmer si la fenêtre annuelle de dépôt est active ou non.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Artiste", "Municipalité"],
+    sectors: ["culture", "création", "rayonnement", "patrimoine"],
+    projectStages: ["développement", "production", "diffusion"],
+    eligibleExpenses: ["création", "médiation", "animation culturelle", "rayonnement"],
+    openStatusReason:
+      "Programme officiel MRC très ciblé. Le lien est direct, mais la date et l'édition active doivent être relues sur la page au moment du scan.",
+  }),
 ];

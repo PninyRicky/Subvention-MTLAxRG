@@ -121,6 +121,7 @@ export default async function ProgrammesPage({
               <option value="Quebec">Québec</option>
               <option value="Federal">Federal</option>
               <option value="Municipal">Municipal</option>
+              <option value="Regional">Régional</option>
               <option value="Canada">Canada</option>
             </select>
             <select
