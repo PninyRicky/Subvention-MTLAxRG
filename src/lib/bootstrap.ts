@@ -5,6 +5,8 @@ import { scoreProgramForProfile } from "@/lib/scoring";
 import { defaultOfficialSources, defaultProfiles, isOfficialInstitutionUrl } from "@/lib/source-registry";
 import { slugify } from "@/lib/utils";
 
+let bootstrapPromise: Promise<void> | null = null;
+
 async function removeUnofficialRecords() {
   const unofficialSources = await prisma.sourceRegistry.findMany({
     where: {
@@ -95,12 +97,7 @@ async function ensureSourcePrograms() {
     }
 
     const slug = slugify(String(payload.name ?? source.name));
-    const existing = await prisma.fundingProgram.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
     const baseData = {
-      slug,
       name: String(payload.name ?? source.name),
       organization: String(payload.organization ?? source.name),
       summary: String(payload.summary ?? source.description ?? ""),
@@ -124,57 +121,39 @@ async function ensureSourcePrograms() {
       lastVerifiedAt: new Date(),
     };
 
-    if (existing) {
-      await prisma.fundingProgram.update({
-        where: { id: existing.id },
-        data: baseData,
-      });
+    const program = await prisma.fundingProgram.upsert({
+      where: { slug },
+      update: baseData,
+      create: {
+        slug,
+        ...baseData,
+      },
+      select: { id: true },
+    });
 
-      touchedPrograms.push(existing.id);
-    } else {
-      const createdProgram = await prisma.fundingProgram.create({
-        data: {
-          ...baseData,
-          intakeWindows: {
-            create: payload.intakeWindow
-              ? {
-                  rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
-                  opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
-                    ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
-                    : null,
-                  closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
-                    ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
-                    : null,
-                  lastConfirmedAt: new Date(),
-                }
-              : undefined,
-          },
-        },
-      });
-
-      touchedPrograms.push(createdProgram.id);
-    }
+    touchedPrograms.push(program.id);
 
     if (payload.intakeWindow) {
-      await prisma.intakeWindow.deleteMany({
-        where: {
-          programId: existing?.id ?? touchedPrograms[touchedPrograms.length - 1],
-        },
-      });
-
-      await prisma.intakeWindow.create({
-        data: {
-          programId: existing?.id ?? touchedPrograms[touchedPrograms.length - 1],
-          rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
-          opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
-            ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
-            : null,
-          closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
-            ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
-            : null,
-          lastConfirmedAt: new Date(),
-        },
-      });
+      await prisma.$transaction([
+        prisma.intakeWindow.deleteMany({
+          where: {
+            programId: program.id,
+          },
+        }),
+        prisma.intakeWindow.create({
+          data: {
+            programId: program.id,
+            rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
+            opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
+              ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
+              : null,
+            closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
+              ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
+              : null,
+            lastConfirmedAt: new Date(),
+          },
+        }),
+      ]);
     }
   }
 
@@ -218,14 +197,11 @@ async function ensureSourcePrograms() {
   }
 }
 
-export async function ensureBootstrapped() {
-  const profileCount = await prisma.serviceProfile.count();
-
-  if (profileCount === 0) {
-    await prisma.serviceProfile.createMany({
-      data: defaultProfiles,
-    });
-  }
+async function runBootstrap() {
+  await prisma.serviceProfile.createMany({
+    data: defaultProfiles,
+    skipDuplicates: true,
+  });
 
   await removeUnofficialRecords();
 
@@ -240,4 +216,15 @@ export async function ensureBootstrapped() {
   }
 
   await ensureSourcePrograms();
+}
+
+export async function ensureBootstrapped() {
+  if (!bootstrapPromise) {
+    bootstrapPromise = runBootstrap().catch((error) => {
+      bootstrapPromise = null;
+      throw error;
+    });
+  }
+
+  await bootstrapPromise;
 }
