@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, FolderSearch2, Radar, ScanSearch } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,15 @@ export function AppShell({
   action?: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/session/logout", {
+      method: "POST",
+    });
+    router.push("/sign-in");
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -95,7 +104,7 @@ export function AppShell({
               <div className="hidden rounded-full border border-black/10 px-4 py-2 text-sm text-black/72 sm:block">
                 {userLabel}
               </div>
-              <Button variant="secondary" onClick={() => window.location.assign("/api/auth/signout?callbackUrl=/sign-in")}>
+              <Button variant="secondary" onClick={() => void handleLogout()}>
                 Sortir
               </Button>
             </div>

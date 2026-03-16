@@ -24,6 +24,7 @@ Copier `.env.example` vers `.env.local` puis remplir:
 DATABASE_URL="postgresql://..."
 AUTH_SECRET="..."
 NEXTAUTH_URL="http://localhost:3000"
+APP_PASSWORD="MTLAxRG"
 RESEND_API_KEY=""
 SMTP_HOST=""
 SMTP_PORT=""
@@ -37,8 +38,8 @@ DEV_AUTH_BYPASS="false"
 Notes:
 
 - `DATABASE_URL` est requis pour utiliser Prisma en runtime.
-- `RESEND_API_KEY` est la voie recommandee en production pour les magic links.
-- si SMTP n’est pas configure en local, le magic link est logge en console.
+- `APP_PASSWORD` protege l’acces a l’app avec un mot de passe partage.
+- `RESEND_API_KEY` et `SMTP_*` ne sont plus requis si tu utilises seulement le mot de passe partage.
 - `DEV_AUTH_BYPASS=true` permet d’ouvrir l’app sans session pour du dev local.
 
 ## Installation
@@ -66,9 +67,9 @@ npm run db:seed
 
 ## Auth
 
-- auth interne par magic link email
-- premier utilisateur cree devient `ADMIN`
-- les autres utilisateurs sont `ANALYST` par defaut
+- acces protege par un mot de passe partage
+- le mot de passe est defini via `APP_PASSWORD`
+- aucune connexion email n’est requise pour la V1
 
 ## Cron Vercel
 

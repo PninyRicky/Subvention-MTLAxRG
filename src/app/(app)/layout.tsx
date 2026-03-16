@@ -22,7 +22,7 @@ export default async function ProtectedLayout({
 
   return (
     <AppShell
-      userLabel={`${viewer.email ?? viewer.name ?? "Interne"} · ${viewer.role.toLowerCase()}`}
+      userLabel={viewer.name ?? "Acces partage"}
       action={<ScanTriggerButton />}
     >
       {children}
