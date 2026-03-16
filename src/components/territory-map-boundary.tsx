@@ -45,5 +45,7 @@ class TerritoryMapErrorBoundary extends Component<Props, State> {
 }
 
 export function SafeTerritoryMap({ territory }: Props) {
-  return <TerritoryMapErrorBoundary territory={territory} />;
+  const mapKey = `${territory.kind}:${territory.territoryCode ?? territory.name}:${territory.label}`;
+
+  return <TerritoryMapErrorBoundary key={mapKey} territory={territory} />;
 }
