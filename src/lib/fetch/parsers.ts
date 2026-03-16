@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { ProgramStatus, SourceType, type SourceRegistry } from "@prisma/client";
 
+import type { AiProgramAnalysis } from "@/lib/ai/schema";
 import { parseRelevantFrenchDeadlineFromText } from "@/lib/dates";
 import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 import { slugify } from "@/lib/utils";
@@ -61,8 +62,17 @@ type FallbackPayload = {
   };
 };
 
-function getStatusFromText(text: string, sourceType: SourceType, hasRelevantDate: boolean) {
+function isDateInPast(date: Date | null | undefined) {
+  if (!date) {
+    return false;
+  }
+  return date.getTime() < Date.now();
+}
+
+function getStatusFromText(text: string, sourceType: SourceType, candidateCloseDate: Date | null) {
   const normalized = text.toLowerCase();
+  const hasRelevantDate = Boolean(candidateCloseDate);
+  const deadlineIsInPast = isDateInPast(candidateCloseDate);
   const hasOpenSignal =
     normalized.includes("en cours") ||
     normalized.includes("appel a projets") ||
@@ -70,6 +80,14 @@ function getStatusFromText(text: string, sourceType: SourceType, hasRelevantDate
     normalized.includes("soumettre") ||
     normalized.includes("deposer une demande") ||
     normalized.includes("depot des demandes");
+
+  if (deadlineIsInPast) {
+    return {
+      status: ProgramStatus.CLOSED,
+      reason: `La date limite detectee (${candidateCloseDate!.toISOString().slice(0, 10)}) est dans le passe. Le programme est considere ferme.`,
+      confidence: 88,
+    };
+  }
 
   if (
     normalized.includes("ferme") ||
@@ -198,10 +216,26 @@ function extractBodyExcerpt(bodyText: string, maxLength = 420) {
   return excerpt.length ? excerpt : null;
 }
 
+function parseIsoDate(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function mergeArrays(regex: string[], ai: string[] | null | undefined): string[] {
+  if (!ai || ai.length === 0) {
+    return regex;
+  }
+  return Array.from(new Set([...regex, ...ai]));
+}
+
 export function parseProgramFromSource(
   source: SourceRegistry,
   html: string | null,
   fallbackPayload?: FallbackPayload | null,
+  aiAnalysis?: AiProgramAnalysis | null,
 ): ParsedProgramPayload {
   const parsedFallback = fallbackPayload ?? {};
   const $ = html ? cheerio.load(html) : null;
@@ -210,81 +244,103 @@ export function parseProgramFromSource(
   const metaDescription =
     $?.('meta[name="description"]').attr("content")?.trim() ||
     String(parsedFallback.summary ?? source.description ?? "");
-  const candidateCloseDate = parseRelevantFrenchDeadlineFromText(bodyText || metaDescription);
-  const statusInfo = getStatusFromText(bodyText || metaDescription, source.type, Boolean(candidateCloseDate));
+  const ai = aiAnalysis && (aiAnalysis.confidence ?? 0) >= 40 ? aiAnalysis : null;
 
-  const applicantTypes = Array.from(
-    new Set([
-      ...(parsedFallback.applicantTypes ?? []),
-      ...detectList(bodyText, ["OBNL", "organisme", "entreprise", "producteur", "artiste", "collectif"]),
-    ]),
-  );
-  const sectors = Array.from(
-    new Set([
-      ...(parsedFallback.sectors ?? []),
-      ...detectList(bodyText, [
-        "marketing numerique",
-        "branding",
-        "rayonnement",
-        "audiovisuel",
-        "production video",
-        "documentaire",
-        "court metrage",
-        "creation",
+  const candidateCloseDate =
+    parseIsoDate(ai?.closesAt) ?? parseRelevantFrenchDeadlineFromText(bodyText || metaDescription);
+  const statusInfo = getStatusFromText(bodyText || metaDescription, source.type, candidateCloseDate);
+
+  const applicantTypes = mergeArrays(
+    Array.from(
+      new Set([
+        ...(parsedFallback.applicantTypes ?? []),
+        ...detectList(bodyText, ["OBNL", "organisme", "entreprise", "producteur", "artiste", "collectif"]),
       ]),
-    ]),
+    ),
+    ai?.applicantTypes,
   );
-  const projectStages = Array.from(
-    new Set([
-      ...(parsedFallback.projectStages ?? []),
-      ...detectList(bodyText, ["developpement", "production", "post-production", "diffusion", "creation"]),
-    ]),
+  const sectors = mergeArrays(
+    Array.from(
+      new Set([
+        ...(parsedFallback.sectors ?? []),
+        ...detectList(bodyText, [
+          "marketing numerique",
+          "branding",
+          "rayonnement",
+          "audiovisuel",
+          "production video",
+          "documentaire",
+          "court metrage",
+          "creation",
+        ]),
+      ]),
+    ),
+    ai?.sectors,
   );
-  const eligibleExpenses = Array.from(
-    new Set([
-      ...(parsedFallback.eligibleExpenses ?? []),
-      ...detectList(bodyText, ["photo", "video", "branding", "site web", "campagne numerique", "preproduction"]),
-    ]),
+  const projectStages = mergeArrays(
+    Array.from(
+      new Set([
+        ...(parsedFallback.projectStages ?? []),
+        ...detectList(bodyText, ["developpement", "production", "post-production", "diffusion", "creation"]),
+      ]),
+    ),
+    ai?.projectStages,
+  );
+  const eligibleExpenses = mergeArrays(
+    Array.from(
+      new Set([
+        ...(parsedFallback.eligibleExpenses ?? []),
+        ...detectList(bodyText, ["photo", "video", "branding", "site web", "campagne numerique", "preproduction"]),
+      ]),
+    ),
+    ai?.eligibleExpenses,
   );
   const directOfficialUrl = pickDirectOfficialUrl(source, $, pageTitle, parsedFallback);
-  const details = parsedFallback.details ?? extractBodyExcerpt(bodyText, 560) ?? metaDescription;
+  const details = ai?.details ?? parsedFallback.details ?? extractBodyExcerpt(bodyText, 560) ?? metaDescription;
   const eligibilityNotes =
+    ai?.eligibilityNotes ??
     parsedFallback.eligibilityNotes ??
     (applicantTypes.length || eligibleExpenses.length
       ? `Demandeurs detectes: ${applicantTypes.join(", ") || "a confirmer"}. Depenses reperees: ${eligibleExpenses.join(", ") || "a confirmer"}.`
       : null);
   const applicationNotes =
+    ai?.applicationNotes ??
     parsedFallback.applicationNotes ??
     (candidateCloseDate
       ? `Le prochain repere de depot detecte est autour du ${candidateCloseDate.toLocaleDateString("fr-CA")}. Toujours revalider sur la page officielle avant depot.`
       : "Verifier la page officielle pour la date limite, les formulaires et les pieces a joindre.");
 
+  const aiStatus = ai?.status ? ProgramStatus[ai.status] : null;
+  const resolvedStatus = aiStatus ?? statusInfo.status;
+  const resolvedReason = ai?.statusReason ?? statusInfo.reason;
+
   const reviewFields: string[] = [];
-  if (!candidateCloseDate && !(parsedFallback.intakeWindow?.rolling ?? false)) {
+  if (!candidateCloseDate && !(ai?.rolling ?? parsedFallback.intakeWindow?.rolling ?? false)) {
     reviewFields.push("dates");
   }
-  if (statusInfo.status !== ProgramStatus.OPEN && source.type === SourceType.OFFICIAL) {
+  if (resolvedStatus !== ProgramStatus.OPEN && source.type === SourceType.OFFICIAL) {
     reviewFields.push("status");
   }
   if (source.type === SourceType.AGGREGATOR || !isOfficialInstitutionUrl(source.url)) {
     reviewFields.push("verification_officielle");
   }
 
+  const regexConfidence = Math.min(95, statusInfo.confidence + (html ? 10 : 0));
   const confidence = Math.max(
     Number(parsedFallback.confidence ?? 0),
-    Math.min(95, statusInfo.confidence + (html ? 10 : 0)),
+    ai ? Math.max(regexConfidence, ai.confidence ?? 0) : regexConfidence,
   );
 
   return {
     slug: slugify(pageTitle),
     name: pageTitle,
-    organization: String(parsedFallback.organization ?? source.name),
-    summary: metaDescription,
+    organization: ai?.organization ?? String(parsedFallback.organization ?? source.name),
+    summary: ai?.summary ?? metaDescription,
     officialUrl: isOfficialInstitutionUrl(directOfficialUrl) ? directOfficialUrl : source.url,
     sourceLandingUrl: isOfficialInstitutionUrl(source.url) ? source.url : null,
     governmentLevel: String(parsedFallback.governmentLevel ?? source.governmentLevel ?? "A confirmer"),
     region: String(parsedFallback.region ?? "Quebec"),
-    status: source.type === SourceType.OFFICIAL ? statusInfo.status : ProgramStatus.REVIEW,
+    status: source.type === SourceType.OFFICIAL ? resolvedStatus : ProgramStatus.REVIEW,
     confidence,
     details,
     eligibilityNotes,
@@ -293,12 +349,12 @@ export function parseProgramFromSource(
     sectors,
     projectStages,
     eligibleExpenses,
-    maxAmount: parsedFallback.maxAmount ?? null,
-    maxCoveragePct: parsedFallback.maxCoveragePct ?? null,
-    openStatusReason: parsedFallback.openStatusReason ?? statusInfo.reason,
+    maxAmount: ai?.maxAmount ?? parsedFallback.maxAmount ?? null,
+    maxCoveragePct: ai?.maxCoveragePct ?? parsedFallback.maxCoveragePct ?? null,
+    openStatusReason: parsedFallback.openStatusReason ?? resolvedReason,
     intakeWindow: {
-      rolling: Boolean(parsedFallback.intakeWindow?.rolling),
-      opensAt: parsedFallback.intakeWindow?.opensAt ? new Date(parsedFallback.intakeWindow.opensAt) : null,
+      rolling: Boolean(ai?.rolling ?? parsedFallback.intakeWindow?.rolling),
+      opensAt: parseIsoDate(ai?.opensAt) ?? (parsedFallback.intakeWindow?.opensAt ? new Date(parsedFallback.intakeWindow.opensAt) : null),
       closesAt: candidateCloseDate ?? (parsedFallback.intakeWindow?.closesAt ? new Date(parsedFallback.intakeWindow.closesAt) : null),
     },
     shouldReview: reviewFields.length > 0,

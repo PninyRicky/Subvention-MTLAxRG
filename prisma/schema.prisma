@@ -135,6 +135,8 @@ model FundingProgram {
   projectStages    String[]
   eligibleExpenses String[]
   openStatusReason String?
+  aiAnalysis       Json?
+  aiAnalyzedAt     DateTime?
   sourceId         String?
   source           SourceRegistry?   @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   intakeWindows    IntakeWindow[]

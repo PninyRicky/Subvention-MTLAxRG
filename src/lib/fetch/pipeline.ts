@@ -1,7 +1,8 @@
-import { ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceRegistry } from "@prisma/client";
+import { Prisma, ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceRegistry } from "@prisma/client";
 
 import { analyzeProgramPage } from "@/lib/ai/analyzer";
 import { isAiEnabled } from "@/lib/ai/provider";
+import type { AiProgramAnalysis } from "@/lib/ai/schema";
 import { env } from "@/lib/env";
 import { parseProgramFromSource } from "@/lib/fetch/parsers";
 import { resolveWorkingOfficialUrls } from "@/lib/link-validation";
@@ -105,7 +106,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       const rawContent = html ?? JSON.stringify(source.fallbackPayload ?? {});
       const contentHash = hashContent(rawContent);
 
-      let aiAnalysis: Awaited<ReturnType<typeof analyzeProgramPage>> | null = null;
+      let aiAnalysis: AiProgramAnalysis | null = null;
       if (isAiEnabled()) {
         const existingDoc = await prisma.sourceDocument.findFirst({
           where: { sourceId: source.id, contentHash },
@@ -114,13 +115,13 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
 
         const existingAi = existingDoc
           ? await prisma.fundingProgram.findFirst({
-              where: { sourceId: source.id, aiAnalyzedAt: { not: null } },
+              where: { sourceId: source.id, aiAnalysis: { not: Prisma.AnyNull } },
               select: { aiAnalysis: true },
             })
           : null;
 
         if (existingAi?.aiAnalysis) {
-          aiAnalysis = existingAi.aiAnalysis as Awaited<ReturnType<typeof analyzeProgramPage>>;
+          aiAnalysis = existingAi.aiAnalysis as unknown as AiProgramAnalysis;
         } else {
           const bodyText = html
             ? html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()

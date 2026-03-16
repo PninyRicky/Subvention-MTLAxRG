@@ -87,8 +87,6 @@ const officialInstitutionHosts = new Set([
   "www.ville.montreal.qc.ca",
   "ville.quebec.qc.ca",
   "www.ville.quebec.qc.ca",
-  "mrcdescollinesdeloutaouais.qc.ca",
-  "www.mrcdescollinesdeloutaouais.qc.ca",
 ]);
 
 const blockedThirdPartyHosts = new Set([
@@ -517,68 +515,6 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         rolling: false,
         closesAt: "2026-01-30T23:59:00.000Z",
       },
-    },
-  },
-  {
-    name: "MRC des Collines - Culture",
-    url: "https://mrcdescollinesdeloutaouais.qc.ca/nos-services/culture/",
-    type: "OFFICIAL",
-    governmentLevel: "Regional",
-    description: "Page officielle culture de la MRC des Collines-de-l'Outaouais.",
-    fallbackPayload: {
-      name: "MRC des Collines - Fonds de developpement culturel",
-      organization: "MRC des Collines-de-l'Outaouais",
-      summary:
-        "Appel de projets culturel regional issu de l'entente de developpement culturel de la MRC des Collines-de-l'Outaouais.",
-      officialUrl: "https://mrcdescollinesdeloutaouais.qc.ca/nos-services/culture/",
-      governmentLevel: "Regional",
-      region: "Outaouais",
-      status: "REVIEW",
-      confidence: 70,
-      details:
-        "Source regionale officielle qui mentionne un Fonds de developpement culturel et des appels de projets pour organisations et municipalites du territoire.",
-      eligibilityNotes:
-        "Pertinent pour les organismes et municipalites de la MRC ayant des projets culturels ou patrimoniaux. L'admissibilite exacte depend de l'appel annuel.",
-      applicationNotes:
-        "La page officielle doit etre revue a chaque scan pour confirmer l'edition en cours, le guide et la date limite de depot.",
-      applicantTypes: ["OBNL", "Municipalite", "Organisme culturel"],
-      sectors: ["culture", "patrimoine", "rayonnement"],
-      projectStages: ["developpement", "diffusion"],
-      eligibleExpenses: ["mediation", "patrimoine", "animation culturelle", "rayonnement"],
-      maxAmount: "Selon l'appel",
-      maxCoveragePct: null,
-      openStatusReason: "Source officielle regionale. La page mentionne un appel de projets, mais la date exacte doit etre confirmee au moment du scan.",
-    },
-  },
-  {
-    name: "MRC des Collines - Soutien aux organismes",
-    url: "https://mrcdescollinesdeloutaouais.qc.ca/nos-services/developpement-social/",
-    type: "OFFICIAL",
-    governmentLevel: "Regional",
-    description: "Page officielle de soutien aux organismes de la MRC des Collines-de-l'Outaouais.",
-    fallbackPayload: {
-      name: "MRC des Collines - Soutien aux organismes",
-      organization: "MRC des Collines-de-l'Outaouais",
-      summary:
-        "Page officielle qui oriente les OBNL et organismes vers des fonds structurants, culturels et de developpement local sur le territoire.",
-      officialUrl: "https://mrcdescollinesdeloutaouais.qc.ca/nos-services/developpement-social/",
-      governmentLevel: "Regional",
-      region: "Outaouais",
-      status: "REVIEW",
-      confidence: 64,
-      details:
-        "Source officielle interessante pour le scenario OBNL, car elle mentionne explicitement l'accompagnement des organismes et l'acces potentiel au Fonds regions et ruralite ainsi qu'au Fonds de developpement culturel.",
-      eligibilityNotes:
-        "S'adresse surtout aux organismes du territoire. Le fit est fort pour des projets structurants, culturels ou d'economie sociale portes localement.",
-      applicationNotes:
-        "La page n'affiche pas necessairement une date limite a elle seule; elle doit servir a reperer le bon fonds officiel ou a declencher une verification humaine.",
-      applicantTypes: ["OBNL", "Organisme communautaire"],
-      sectors: ["developpement social", "culture", "rayonnement"],
-      projectStages: ["developpement", "diffusion"],
-      eligibleExpenses: ["accompagnement", "projet structurant", "rayonnement", "mediation"],
-      maxAmount: "Selon le fonds",
-      maxCoveragePct: null,
-      openStatusReason: "Source officielle regionale utile pour reperer des fonds publics, mais la date et le programme exacts doivent etre confirmes sur l'appel cible.",
     },
   },
   buildRegionalReviewSource({

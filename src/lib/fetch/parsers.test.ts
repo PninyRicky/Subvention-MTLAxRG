@@ -44,4 +44,53 @@ describe("parseProgramFromSource", () => {
     expect(parsed.officialUrl).toBe(source.url);
     expect(parsed.sourceLandingUrl).toBe(source.url);
   });
+
+  it("marque CLOSED quand la date limite est dans le passe", () => {
+    const parsed = parseProgramFromSource(source, null, {
+      name: "Programme test ferme",
+      summary: "Depot des demandes en cours. Date limite 17 aout 2017.",
+      officialUrl: "https://sodec.gouv.qc.ca/vieux-programme",
+    });
+
+    expect(parsed.status).toBe("CLOSED");
+    expect(parsed.openStatusReason).toMatch(/passe/i);
+  });
+
+  it("integre les donnees AI quand disponibles", () => {
+    const parsed = parseProgramFromSource(
+      source,
+      null,
+      {
+        name: "SODEC - Test AI",
+        summary: "Resume basique",
+        officialUrl: "https://sodec.gouv.qc.ca/test",
+      },
+      {
+        status: "OPEN",
+        statusReason: "Le programme accepte les demandes.",
+        closesAt: "2027-06-15",
+        opensAt: null,
+        rolling: false,
+        organization: "SODEC via AI",
+        summary: "Resume enrichi par AI",
+        maxAmount: "50 000 $",
+        maxCoveragePct: 75,
+        applicantTypes: ["Producteur delegue"],
+        sectors: ["cinema"],
+        projectStages: null,
+        eligibleExpenses: null,
+        eligibilityNotes: "Admissible aux producteurs",
+        applicationNotes: null,
+        details: "Detail enrichi par AI",
+        confidence: 82,
+      },
+    );
+
+    expect(parsed.organization).toBe("SODEC via AI");
+    expect(parsed.summary).toBe("Resume enrichi par AI");
+    expect(parsed.maxAmount).toBe("50 000 $");
+    expect(parsed.details).toBe("Detail enrichi par AI");
+    expect(parsed.applicantTypes).toContain("Producteur delegue");
+    expect(parsed.intakeWindow.closesAt?.toISOString()).toContain("2027-06-15");
+  });
 });

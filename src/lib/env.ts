@@ -12,6 +12,10 @@ export const env = {
   smtpFrom: process.env.SMTP_FROM ?? "noreply@mtla.local",
   cronSecret: process.env.CRON_SECRET ?? "local-cron-secret",
   devAuthBypass: process.env.DEV_AUTH_BYPASS === "true",
+  aiApiKey: process.env.AI_API_KEY ?? "",
+  aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
+  aiModel: process.env.AI_MODEL ?? "deepseek-chat",
+  aiEnabled: process.env.AI_ENABLED === "true",
 };
 
 export const hasSmtpConfig =
