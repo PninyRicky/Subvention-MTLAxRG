@@ -81,12 +81,12 @@ export function AppShell({
                     className={cn(
                       "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
                       active
-                        ? "bg-black text-white [&_*]:text-inherit"
+                        ? "bg-black !text-white"
                         : "text-black/72 hover:bg-black/[0.04] hover:text-black",
                     )}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                    <Icon className={cn("h-4 w-4", active ? "!text-white" : "")} />
+                    <span className={cn(active ? "!text-white" : "")}>{item.label}</span>
                   </Link>
 
                   {item.href === "/programmes" && (institutionLinks.length > 0 || mrcLinks.length > 0) ? (
