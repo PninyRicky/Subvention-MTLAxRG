@@ -5,15 +5,19 @@ type CheckedLink = {
   ok: boolean;
 };
 
+const LINK_TIMEOUT_MS = 6_000;
+const LINK_REVALIDATE_SECONDS = 60 * 60 * 6;
+
 async function requestLink(url: string, method: "HEAD" | "GET") {
   const response = await fetch(url, {
     method,
+    signal: AbortSignal.timeout(LINK_TIMEOUT_MS),
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
     redirect: "follow",
     next: {
-      revalidate: 0,
+      revalidate: LINK_REVALIDATE_SECONDS,
     },
   });
 

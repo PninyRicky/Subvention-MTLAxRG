@@ -87,6 +87,19 @@ const officialInstitutionHosts = new Set([
   "www.ville.montreal.qc.ca",
   "ville.quebec.qc.ca",
   "www.ville.quebec.qc.ca",
+  "laval.ca",
+  "www.laval.ca",
+  "sherbrooke.ca",
+  "www.sherbrooke.ca",
+  "gatineau.ca",
+  "www.gatineau.ca",
+  "longueuil.quebec",
+  "www.longueuil.quebec",
+  "cms.longueuil.quebec",
+  "portneuf.ca",
+  "www.portneuf.ca",
+  "ville.saguenay.ca",
+  "www.ville.saguenay.ca",
   "mrcmemphremagog.com",
   "www.mrcmemphremagog.com",
 ]);
@@ -517,6 +530,104 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         rolling: false,
         closesAt: "2026-01-30T23:59:00.000Z",
       },
+    },
+  },
+  {
+    name: "Ville de Laval - Soutien aux organismes culturels professionnels",
+    url: "https://www.laval.ca/culture/soutien-artistes-organismes-culturels/soutien-professionnels/",
+    type: "OFFICIAL",
+    governmentLevel: "Municipal",
+    description: "Programme officiel de la Ville de Laval pour les organismes culturels professionnels.",
+    fallbackPayload: {
+      name: "Ville de Laval - Soutien aux organismes culturels professionnels",
+      organization: "Ville de Laval",
+      summary:
+        "Programme municipal de soutien au fonctionnement, aux projets et au rayonnement des organismes culturels professionnels lavallois.",
+      officialUrl: "https://www.laval.ca/culture/soutien-artistes-organismes-culturels/soutien-professionnels/",
+      governmentLevel: "Municipal",
+      region: "Laval",
+      status: "REVIEW",
+      confidence: 78,
+      details:
+        "La page officielle de Laval regroupe plusieurs leviers réels: soutien annuel au fonctionnement, soutien à projet, résidence en arts de la scène et soutien promotionnel.",
+      eligibilityNotes:
+        "Le programme s'adresse aux organismes culturels professionnels admis au registre municipal. Certains volets couvrent le fonctionnement, d'autres des projets ou des résidences.",
+      applicationNotes:
+        "La page officielle affiche des formulaires, guides, pièces à joindre et des dates de tombée distinctes selon les volets. Le scan doit qualifier le volet actif avant de classer l'opportunité comme ouverte.",
+      applicantTypes: ["OBNL", "Organisme culturel"],
+      sectors: ["culture", "arts", "rayonnement", "médiation"],
+      projectStages: ["développement", "production", "diffusion"],
+      eligibleExpenses: ["fonctionnement", "projet culturel", "résidence", "promotion"],
+      maxAmount: "Selon le volet",
+      maxCoveragePct: 40,
+      openStatusReason:
+        "Page officielle municipale détaillée détectée. L'ouverture doit être confirmée au niveau du volet concerné et de sa date de tombée.",
+    },
+  },
+  {
+    name: "Ville de Sherbrooke - Appel de projets ponctuels pour les organismes culturels",
+    url: "https://www.sherbrooke.ca/fr/culture-sports-et-loisirs/soutien-aux-organismes-culturels/appel-de-projets-ponctuels-pour-les-organismes-culturels",
+    type: "OFFICIAL",
+    governmentLevel: "Municipal",
+    description: "Appel officiel de la Ville de Sherbrooke pour des projets ponctuels d'organismes culturels.",
+    fallbackPayload: {
+      name: "Ville de Sherbrooke - Appel de projets ponctuels pour les organismes culturels",
+      organization: "Ville de Sherbrooke",
+      summary:
+        "Appel municipal destiné aux organismes culturels sherbrookois pour financer des projets ponctuels et des activités culturelles sur le territoire.",
+      officialUrl:
+        "https://www.sherbrooke.ca/fr/culture-sports-et-loisirs/soutien-aux-organismes-culturels/appel-de-projets-ponctuels-pour-les-organismes-culturels",
+      governmentLevel: "Municipal",
+      region: "Estrie",
+      status: "REVIEW",
+      confidence: 76,
+      details:
+        "La page officielle de Sherbrooke est un appel de projets ciblé pour les organismes culturels. Elle précise l'aide financière, l'admissibilité et la mécanique de dépôt.",
+      eligibilityNotes:
+        "Pertinent pour les organismes culturels reconnus ou actifs à Sherbrooke. La géographie admissible et le type d'activité doivent être relus directement sur l'appel en vigueur.",
+      applicationNotes:
+        "Le scan doit confirmer la date de dépôt annuelle et conserver le lien direct vers cet appel plutôt qu'un portail général de loisirs et culture.",
+      applicantTypes: ["OBNL", "Organisme culturel"],
+      sectors: ["culture", "diffusion", "animation culturelle"],
+      projectStages: ["développement", "diffusion"],
+      eligibleExpenses: ["projet culturel", "animation", "rayonnement"],
+      maxAmount: "Selon l'appel",
+      maxCoveragePct: null,
+      openStatusReason:
+        "Appel municipal officiel identifié. Le statut demeure à vérifier tant qu'une date de dépôt courante n'est pas extraite de la page.",
+    },
+  },
+  {
+    name: "Ville de Gatineau - Programme de soutien aux organismes culturels",
+    url: "https://www.gatineau.ca/portail/default.aspx?c=fr-CA&p=guichet_municipal%2Fsubventions_commandites%2Fprogramme_soutien_organismes_culturels",
+    type: "OFFICIAL",
+    governmentLevel: "Municipal",
+    description: "Programme officiel de la Ville de Gatineau pour soutenir les organismes culturels.",
+    fallbackPayload: {
+      name: "Ville de Gatineau - Programme de soutien aux organismes culturels",
+      organization: "Ville de Gatineau",
+      summary:
+        "Programme municipal structurant qui soutient la mission, le développement, les événements et les projets des organismes culturels gatinois.",
+      officialUrl:
+        "https://www.gatineau.ca/portail/default.aspx?c=fr-CA&p=guichet_municipal%2Fsubventions_commandites%2Fprogramme_soutien_organismes_culturels",
+      governmentLevel: "Municipal",
+      region: "Outaouais",
+      status: "REVIEW",
+      confidence: 81,
+      details:
+        "La page officielle décrit le PSOC modernisé de Gatineau, ses volets, les maximums annuels, les organismes admissibles et les guides téléchargeables.",
+      eligibilityNotes:
+        "Le programme s'adresse aux organismes culturels gatinois, OBNL ou coopératives de solidarité, dans les domaines des arts, de la culture, de la littérature et du patrimoine.",
+      applicationNotes:
+        "Le scan doit distinguer les volets mission, projets ou loisir culturel et confirmer les échéances courantes, car la page porte un programme structurant plutôt qu'un simple portail.",
+      applicantTypes: ["OBNL", "Coopérative", "Organisme culturel"],
+      sectors: ["culture", "patrimoine", "rayonnement", "développement organisationnel"],
+      projectStages: ["développement", "production", "diffusion"],
+      eligibleExpenses: ["fonctionnement", "projet culturel", "événement", "services municipaux"],
+      maxAmount: "Jusqu'à 160 000 $ selon le volet",
+      maxCoveragePct: 40,
+      openStatusReason:
+        "Programme municipal officiel confirmé. Les volets et dates doivent être relus à chaque scan pour classer correctement l'opportunité.",
     },
   },
   buildRegionalReviewSource({

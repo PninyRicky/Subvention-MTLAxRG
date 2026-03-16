@@ -17,28 +17,125 @@ type PipelineOptions = {
   initiatedById?: string | null;
 };
 
+type ParsedProgram = ReturnType<typeof parseProgramFromSource>;
+
+const SOURCE_FETCH_TIMEOUT_MS = 8_000;
+const SOURCE_FETCH_MAX_ATTEMPTS = 2;
+const REVIEW_REASON = "Informations incomplètes ou ambiguës après collecte.";
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchSourceHtml(source: SourceRegistry) {
-  try {
-    const response = await fetch(source.url, {
-      headers: {
-        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= SOURCE_FETCH_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(source.url, {
+        signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
+        headers: {
+          "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+        },
+        next: {
+          revalidate: 0,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < SOURCE_FETCH_MAX_ATTEMPTS) {
+        await wait(350 * attempt);
+      }
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(`Echec de collecte pour ${source.url}:`, lastError);
+  }
+
+  return null;
+}
+
+async function syncReviewQueueForProgram(programId: string, fetchRunId: string, parsed: ParsedProgram) {
+  const pendingReviews = await prisma.reviewQueue.findMany({
+    where: {
+      programId,
+      status: ReviewStatus.PENDING,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (!parsed.shouldReview) {
+    if (!pendingReviews.length) {
+      return 0;
+    }
+
+    await prisma.reviewQueue.updateMany({
+      where: {
+        id: {
+          in: pendingReviews.map((review) => review.id),
+        },
       },
-      next: {
-        revalidate: 0,
+      data: {
+        status: ReviewStatus.APPROVED,
+        notes: "Résolu automatiquement par le dernier scan.",
+        reviewedAt: new Date(),
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return await response.text();
-  } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(`Echec de collecte pour ${source.url}:`, error);
-    }
-    return null;
+    return 0;
   }
+
+  const [primaryReview, ...duplicateReviews] = pendingReviews;
+
+  if (primaryReview) {
+    await prisma.reviewQueue.update({
+      where: { id: primaryReview.id },
+      data: {
+        fetchRunId,
+        reason: REVIEW_REASON,
+        fields: parsed.reviewFields,
+        notes: null,
+        reviewedAt: null,
+      },
+    });
+  } else {
+    await prisma.reviewQueue.create({
+      data: {
+        programId,
+        fetchRunId,
+        reason: REVIEW_REASON,
+        fields: parsed.reviewFields,
+        status: ReviewStatus.PENDING,
+      },
+    });
+  }
+
+  if (duplicateReviews.length) {
+    await prisma.reviewQueue.updateMany({
+      where: {
+        id: {
+          in: duplicateReviews.map((review) => review.id),
+        },
+      },
+      data: {
+        status: ReviewStatus.APPROVED,
+        notes: "Doublon de revue fermé automatiquement par le dernier scan.",
+        reviewedAt: new Date(),
+      },
+    });
+  }
+
+  return 1;
 }
 
 export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) {
@@ -268,18 +365,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
         });
       }
 
-      if (parsed.shouldReview) {
-        reviewCount += 1;
-        await prisma.reviewQueue.create({
-          data: {
-            programId: program.id,
-            fetchRunId: fetchRun.id,
-            reason: "Informations incompletes ou ambigues apres collecte.",
-            fields: parsed.reviewFields,
-            status: ReviewStatus.PENDING,
-          },
-        });
-      }
+      reviewCount += await syncReviewQueueForProgram(program.id, fetchRun.id, parsed);
     }
 
     return await prisma.fetchRun.update({
