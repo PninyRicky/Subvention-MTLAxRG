@@ -19,6 +19,8 @@ export type MrcGroup = {
   slug: string;
   name: string;
   regionName: string;
+  website?: string;
+  code?: string;
   programCount: number;
   programs: MrcProgramSummary[];
 };
@@ -96,7 +98,20 @@ export const getMrcGroups = cache(async (): Promise<MrcGroup[]> => {
   ]);
 
   const sortedDirectory = [...mrcDirectory].sort((left, right) => right.normalizedName.length - left.normalizedName.length);
-  const groups = new Map<string, MrcGroup>();
+  const groups = new Map<string, MrcGroup>(
+    mrcDirectory.map((entry) => [
+      territorySlug(entry.name),
+      {
+        slug: territorySlug(entry.name),
+        name: entry.name,
+        regionName: entry.regionName,
+        website: entry.website,
+        code: entry.code,
+        programCount: 0,
+        programs: [],
+      } satisfies MrcGroup,
+    ]),
+  );
 
   for (const program of regionalPrograms) {
     const match = findMrcMatch(program, sortedDirectory);
@@ -128,6 +143,8 @@ export const getMrcGroups = cache(async (): Promise<MrcGroup[]> => {
       slug,
       name: match.name,
       regionName: match.regionName,
+      website: match.website,
+      code: match.code,
       programCount: 1,
       programs: [programSummary],
     });

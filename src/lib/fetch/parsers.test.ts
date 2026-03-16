@@ -93,4 +93,33 @@ describe("parseProgramFromSource", () => {
     expect(parsed.applicantTypes).toContain("Producteur delegue");
     expect(parsed.intakeWindow.closesAt?.toISOString()).toContain("2027-06-15");
   });
+
+  it("repere un lien fonds ou programmes depuis un portail regional generique", () => {
+    const regionalSource = {
+      ...source,
+      name: "MRC de Lotbinière - Fonds, programmes et soutien territorial",
+      url: "https://www.mrclotbiniere.org",
+      governmentLevel: "Regional",
+    } satisfies SourceRegistry;
+
+    const parsed = parseProgramFromSource(
+      regionalSource,
+      `
+        <html>
+          <head><title>MRC de Lotbinière</title></head>
+          <body>
+            <a href="/services-aux-citoyens/programmes-et-mesures/fonds-regions-ruralites/">Fonds Régions et Ruralité</a>
+            <a href="/nous-joindre/">Nous joindre</a>
+            <a href="/mrc-de-lotbiniere/services/culture-et-patrimoine/">Culture et patrimoine</a>
+          </body>
+        </html>
+      `,
+      {
+        name: "MRC de Lotbinière - Fonds, programmes et soutien territorial",
+        summary: "Portail officiel de la MRC pour ses fonds et programmes.",
+      },
+    );
+
+    expect(parsed.officialUrl).toContain("fonds-regions-ruralites");
+  });
 });

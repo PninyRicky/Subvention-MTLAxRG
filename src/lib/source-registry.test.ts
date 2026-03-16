@@ -21,6 +21,8 @@ describe("isOfficialInstitutionUrl", () => {
       ),
     ).toBe(true);
     expect(isOfficialInstitutionUrl("https://portneuf.ca/developpement-economique/fonds/")).toBe(true);
+    expect(isOfficialInstitutionUrl("https://www.mrclotbiniere.org")).toBe(true);
+    expect(isOfficialInstitutionUrl("https://www.cotedegaspe.ca/developpement-culturel")).toBe(true);
   });
 
   it("bloque les agregateurs et plateformes tierces", () => {

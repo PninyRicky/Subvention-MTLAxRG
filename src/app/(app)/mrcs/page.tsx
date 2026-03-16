@@ -37,7 +37,7 @@ export default async function MrcPage({
 
           <div className="rounded-[24px] border border-black/10 bg-black/[0.02] px-5 py-4 text-sm text-black/64">
             <p>
-              <span className="font-medium text-black">MRC intégrées:</span> {groups.length}
+              <span className="font-medium text-black">MRC répertoriées:</span> {groups.length}
             </p>
             <p className="mt-1">
               <span className="font-medium text-black">Programmes régionaux:</span>{" "}
@@ -56,61 +56,84 @@ export default async function MrcPage({
                   <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">MRC sélectionnée</p>
                   <h2 className="mt-2 text-3xl font-medium tracking-[-0.06em]">{selectedGroup.name}</h2>
                   <p className="mt-2 text-sm text-black/62">{selectedGroup.regionName}</p>
+                  {selectedGroup.code ? <p className="mt-1 text-sm text-black/52">Code officiel: {selectedGroup.code}</p> : null}
                 </div>
                 <Badge>{selectedGroup.programCount} programmes</Badge>
               </div>
 
-              <div className="mt-6 space-y-4">
-                {selectedGroup.programs.map((program) => {
-                  const tone =
-                    program.status === ProgramStatus.OPEN
-                      ? "open"
-                      : program.status === ProgramStatus.REVIEW
-                        ? "review"
-                        : "closed";
+              {selectedGroup.website ? (
+                <div className="mt-5 rounded-[24px] border border-black/10 bg-black/[0.02] px-5 py-4 text-sm text-black/62">
+                  <span className="font-medium text-black">Site officiel:</span>{" "}
+                  <a
+                    href={selectedGroup.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[color:var(--accent)] underline-offset-4 hover:underline"
+                  >
+                    {selectedGroup.website}
+                  </a>
+                </div>
+              ) : null}
 
-                  return (
-                    <div key={program.id} className="rounded-[26px] border border-black/10 p-5">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="max-w-3xl">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={tone}>{program.status}</Badge>
-                            <Badge>{program.region}</Badge>
-                          </div>
-                          <Link href={`/programmes/${program.id}`} className="mt-3 block">
-                            <p className="text-xl font-medium tracking-[-0.04em]">{program.name}</p>
-                            <p className="mt-2 text-sm text-black/58">{program.organization}</p>
-                            <p className="mt-3 text-sm leading-6 text-black/66">{program.summary}</p>
-                          </Link>
-                        </div>
+              {selectedGroup.programs.length ? (
+                <div className="mt-6 space-y-4">
+                  {selectedGroup.programs.map((program) => {
+                    const tone =
+                      program.status === ProgramStatus.OPEN
+                        ? "open"
+                        : program.status === ProgramStatus.REVIEW
+                          ? "review"
+                          : "closed";
 
-                        <div className="space-y-3 text-sm text-black/62">
-                          <p>
-                            <span className="font-medium text-black">Mise à jour:</span> {formatDateTime(program.updatedAt)}
-                          </p>
-                          <div className="flex flex-col gap-2">
-                            <Link
-                              href={`/programmes/${program.id}`}
-                              className="inline-flex items-center gap-2 text-[color:var(--accent)] underline-offset-4 hover:underline"
-                            >
-                              Ouvrir la fiche
+                    return (
+                      <div key={program.id} className="rounded-[26px] border border-black/10 p-5">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="max-w-3xl">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone={tone}>{program.status}</Badge>
+                              <Badge>{program.region}</Badge>
+                            </div>
+                            <Link href={`/programmes/${program.id}`} className="mt-3 block">
+                              <p className="text-xl font-medium tracking-[-0.04em]">{program.name}</p>
+                              <p className="mt-2 text-sm text-black/58">{program.organization}</p>
+                              <p className="mt-3 text-sm leading-6 text-black/66">{program.summary}</p>
                             </Link>
-                            <a
-                              href={program.officialUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 text-[color:var(--accent)] underline-offset-4 hover:underline"
-                            >
-                              Ouvrir la source officielle
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                          </div>
+
+                          <div className="space-y-3 text-sm text-black/62">
+                            <p>
+                              <span className="font-medium text-black">Mise à jour:</span> {formatDateTime(program.updatedAt)}
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              <Link
+                                href={`/programmes/${program.id}`}
+                                className="inline-flex items-center gap-2 text-[color:var(--accent)] underline-offset-4 hover:underline"
+                              >
+                                Ouvrir la fiche
+                              </Link>
+                              <a
+                                href={program.officialUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 text-[color:var(--accent)] underline-offset-4 hover:underline"
+                              >
+                                Ouvrir la source officielle
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-5 py-8 text-sm leading-6 text-black/58">
+                  Aucun programme régional n&apos;a encore été extrait pour cette MRC. Le site officiel est bien
+                  répertorié et sera utilisé par le scan pour repérer les pages de fonds, programmes, culture et
+                  soutien territorial.
+                </div>
+              )}
             </>
           ) : (
             <div className="rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-5 py-8 text-sm leading-6 text-black/58">

@@ -1,3 +1,4 @@
+import { officialTerritorialHosts } from "@/lib/official-territorial-hosts";
 import type { Prisma } from "@prisma/client";
 
 type IntakeWindowSeed = {
@@ -109,6 +110,18 @@ const blockedThirdPartyHosts = new Set([
   "www.hellodarwin.com",
 ]);
 
+const officialTerritorialHostSet = new Set<string>(officialTerritorialHosts);
+
+function matchesExplicitOfficialHost(hostname: string) {
+  const bareHostname = hostname.replace(/^www\./, "");
+  return (
+    officialInstitutionHosts.has(hostname) ||
+    officialInstitutionHosts.has(bareHostname) ||
+    officialTerritorialHostSet.has(hostname) ||
+    officialTerritorialHostSet.has(bareHostname)
+  );
+}
+
 function buildRegionalReviewSource(input: RegionalReviewSourceInput): OfficialSourceSeed {
   return {
     name: input.name,
@@ -151,7 +164,7 @@ export function isOfficialInstitutionUrl(candidate: string | null | undefined) {
       return false;
     }
 
-    if (officialInstitutionHosts.has(hostname)) {
+    if (matchesExplicitOfficialHost(hostname)) {
       return true;
     }
 

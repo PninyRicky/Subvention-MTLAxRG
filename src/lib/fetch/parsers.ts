@@ -146,6 +146,30 @@ function normalizeWords(input: string) {
     .filter((word) => word.length > 3);
 }
 
+const genericProgramKeywords = [
+  "fonds",
+  "programme",
+  "programmes",
+  "subvention",
+  "subventions",
+  "financement",
+  "soutien",
+  "aide",
+  "culture",
+  "patrimoine",
+  "appel",
+  "projet",
+  "projets",
+  "rural",
+  "ruralite",
+  "régions",
+  "regions",
+  "mesures",
+  "organismes",
+];
+
+const lowValueLinkKeywords = ["contact", "nous joindre", "accueil", "a propos", "carriere", "carrieres"];
+
 function pickDirectOfficialUrl(
   source: SourceRegistry,
   $: cheerio.CheerioAPI | null,
@@ -165,6 +189,7 @@ function pickDirectOfficialUrl(
   }
 
   const targetWords = normalizeWords(targetName);
+  const regionalSource = source.governmentLevel?.toLowerCase() === "regional";
   let bestHref = source.url;
   let bestScore = 0;
 
@@ -192,6 +217,22 @@ function pickDirectOfficialUrl(
 
     if (haystack.includes("programme") || haystack.includes("subvention") || haystack.includes("aide")) {
       score += 1;
+    }
+
+    for (const keyword of genericProgramKeywords) {
+      if (haystack.includes(keyword)) {
+        score += regionalSource ? 3 : 2;
+      }
+    }
+
+    for (const keyword of lowValueLinkKeywords) {
+      if (haystack.includes(keyword)) {
+        score -= 3;
+      }
+    }
+
+    if (regionalSource && (absoluteHref.includes("/culture") || absoluteHref.includes("/fonds") || absoluteHref.includes("/programmes"))) {
+      score += 4;
     }
 
     if (absoluteHref.endsWith(".pdf")) {
