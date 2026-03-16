@@ -237,7 +237,8 @@ export default async function ProgrammeDetailPage({
                 <span className="font-medium text-black">Nom:</span> {program.source?.name ?? "Non associee"}
               </p>
               <p>
-                <span className="font-medium text-black">Type:</span> {program.source?.type ?? "A confirmer"}
+                <span className="font-medium text-black">Type:</span>{" "}
+                {program.source?.type === "OFFICIAL" ? "Source officielle" : "A confirmer"}
               </p>
               <p>
                 <span className="font-medium text-black">Cadence:</span> {program.source?.cadence ?? "A confirmer"}

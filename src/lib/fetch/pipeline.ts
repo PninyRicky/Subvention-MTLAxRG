@@ -5,6 +5,7 @@ import { parseProgramFromSource } from "@/lib/fetch/parsers";
 import { prisma } from "@/lib/prisma";
 import { scoreProgramForProfile } from "@/lib/scoring";
 import { hasRunToday } from "@/lib/scheduler";
+import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 import { hashContent } from "@/lib/utils";
 
 type PipelineOptions = {
@@ -80,7 +81,10 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
   try {
     const [sources, profiles] = await Promise.all([
       prisma.sourceRegistry.findMany({
-        where: { active: true },
+        where: {
+          active: true,
+          type: "OFFICIAL",
+        },
       }),
       prisma.serviceProfile.findMany({
         where: { active: true },
@@ -91,8 +95,9 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
     let updatedCount = 0;
     let closedCount = 0;
     let reviewCount = 0;
+    const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
 
-    for (const source of sources) {
+    for (const source of officialSources) {
       const html = await fetchSourceHtml(source);
       const rawContent = html ?? JSON.stringify(source.fallbackPayload ?? {});
       const contentHash = hashContent(rawContent);
@@ -241,7 +246,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       where: { id: fetchRun.id },
       data: {
         status: ScanStatus.COMPLETED,
-        sourceCount: sources.length,
+        sourceCount: officialSources.length,
         discoveredCount,
         updatedCount,
         closedCount,

@@ -22,15 +22,26 @@ describe("parseProgramFromSource", () => {
     const parsed = parseProgramFromSource(source, null, {
       name: "SODEC - Soutien au developpement audiovisuel",
       summary: "Resume de test",
-      officialUrl: "https://example.com/programme-direct",
+      officialUrl: "https://sodec.gouv.qc.ca/programme-direct",
       details: "Details",
       eligibilityNotes: "Eligibilite",
       applicationNotes: "Depot",
     });
 
-    expect(parsed.officialUrl).toBe("https://example.com/programme-direct");
+    expect(parsed.officialUrl).toBe("https://sodec.gouv.qc.ca/programme-direct");
     expect(parsed.details).toBe("Details");
     expect(parsed.eligibilityNotes).toBe("Eligibilite");
     expect(parsed.applicationNotes).toBe("Depot");
+  });
+
+  it("ignore une URL tierce du fallback et garde la source officielle", () => {
+    const parsed = parseProgramFromSource(source, null, {
+      name: "SODEC - Soutien au developpement audiovisuel",
+      summary: "Resume de test",
+      officialUrl: "https://hellodarwin.com/fr/subventions/programme-x",
+    });
+
+    expect(parsed.officialUrl).toBe(source.url);
+    expect(parsed.sourceLandingUrl).toBe(source.url);
   });
 });

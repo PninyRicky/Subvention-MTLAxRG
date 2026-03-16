@@ -137,7 +137,8 @@ export default async function DashboardPage() {
             </div>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
               <li>Un programme n’est marque ouvert que si la source officielle le confirme.</li>
-              <li>Les programmes detectes via agregateur restent en revision jusqu’a validation humaine.</li>
+              <li>Les agregateurs, chambres de commerce et plateformes tierces sont exclus du scan automatise.</li>
+              <li>Le registre privilegie les sources officielles gouvernementales, municipales et regionales publiques.</li>
               <li>Les scans automatiques tournent lundi, mercredi et vendredi une fois par jour sur Vercel Hobby.</li>
             </ul>
           </Card>

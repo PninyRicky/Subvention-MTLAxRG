@@ -108,7 +108,9 @@ export function daysUntil(date?: Date | null, now = new Date()) {
 
 export function parseFrenchDateFromText(text: string) {
   const normalized = text.toLowerCase();
-  const match = normalized.match(/(\d{1,2})\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(\d{4})/i);
+  const match = normalized.match(
+    /(\d{1,2})(?:er)?\s+(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre)\s+(\d{4})/i,
+  );
 
   if (!match) {
     return null;
@@ -122,4 +124,31 @@ export function parseFrenchDateFromText(text: string) {
   }
 
   return new Date(`${year}-${month}-${day.padStart(2, "0")}T12:00:00.000Z`);
+}
+
+export function parseRelevantFrenchDeadlineFromText(text: string) {
+  const normalized = text.toLowerCase().replace(/\s+/g, " ");
+  const keywordMatchers = [
+    /date limite[^.]{0,140}/g,
+    /date de depot[^.]{0,140}/g,
+    /depot des demandes[^.]{0,140}/g,
+    /soumettre une demande[^.]{0,140}/g,
+    /jusqu[’']au[^.]{0,140}/g,
+    /cloture[^.]{0,140}/g,
+    /clôture[^.]{0,140}/g,
+  ];
+
+  for (const matcher of keywordMatchers) {
+    const snippets = normalized.match(matcher) ?? [];
+
+    for (const snippet of snippets) {
+      const parsed = parseFrenchDateFromText(snippet);
+
+      if (parsed) {
+        return parsed;
+      }
+    }
+  }
+
+  return parseFrenchDateFromText(normalized);
 }

@@ -1,7 +1,8 @@
 import * as cheerio from "cheerio";
 import { ProgramStatus, SourceType, type SourceRegistry } from "@prisma/client";
 
-import { parseFrenchDateFromText } from "@/lib/dates";
+import { parseRelevantFrenchDeadlineFromText } from "@/lib/dates";
+import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 import { slugify } from "@/lib/utils";
 
 export type ParsedProgramPayload = {
@@ -60,14 +61,24 @@ type FallbackPayload = {
   };
 };
 
-function getStatusFromText(text: string, sourceType: SourceType) {
+function getStatusFromText(text: string, sourceType: SourceType, hasRelevantDate: boolean) {
   const normalized = text.toLowerCase();
+  const hasOpenSignal =
+    normalized.includes("en cours") ||
+    normalized.includes("appel a projets") ||
+    normalized.includes("appel de projets") ||
+    normalized.includes("soumettre") ||
+    normalized.includes("deposer une demande") ||
+    normalized.includes("depot des demandes");
 
   if (
     normalized.includes("ferme") ||
     normalized.includes("fermé") ||
     normalized.includes("closed") ||
-    normalized.includes("date limite depassee")
+    normalized.includes("date limite depassee") ||
+    normalized.includes("date limite dépassée") ||
+    normalized.includes("complet") ||
+    normalized.includes("aucun nouvel organisme")
   ) {
     return {
       status: ProgramStatus.CLOSED,
@@ -76,26 +87,20 @@ function getStatusFromText(text: string, sourceType: SourceType) {
     };
   }
 
-  if (
-    normalized.includes("appel a projets") ||
-    normalized.includes("appel de projets") ||
-    normalized.includes("soumettre") ||
-    normalized.includes("deposer une demande") ||
-    normalized.includes("depot des demandes")
-  ) {
+  if (hasOpenSignal && (hasRelevantDate || normalized.includes("en cours"))) {
     return {
       status: sourceType === SourceType.OFFICIAL ? ProgramStatus.OPEN : ProgramStatus.REVIEW,
       reason:
         sourceType === SourceType.OFFICIAL
-          ? "La source officielle semble active et decrire un depot en cours."
+          ? "La source officielle semble active et decrire un depot en cours avec un signal de date ou d'ouverture."
           : "Le programme est detecte sur une source secondaire; confirmation officielle requise.",
       confidence: sourceType === SourceType.OFFICIAL ? 72 : 48,
     };
   }
 
   return {
-    status: sourceType === SourceType.OFFICIAL ? ProgramStatus.REVIEW : ProgramStatus.REVIEW,
-    reason: "Aucun signal assez clair sur l'ouverture; verification humaine recommandee.",
+    status: ProgramStatus.REVIEW,
+    reason: "Aucun signal officiel assez clair sur l'ouverture en cours; verification humaine recommandee.",
     confidence: 40,
   };
 }
@@ -130,7 +135,11 @@ function pickDirectOfficialUrl(
   fallbackPayload?: FallbackPayload | null,
 ) {
   if (fallbackPayload?.officialUrl) {
-    return fallbackPayload.officialUrl;
+    if (isOfficialInstitutionUrl(fallbackPayload.officialUrl)) {
+      return fallbackPayload.officialUrl;
+    }
+
+    return source.url;
   }
 
   if (!$) {
@@ -150,7 +159,7 @@ function pickDirectOfficialUrl(
     }
 
     const absoluteHref = toAbsoluteUrl(source.url, href);
-    if (!absoluteHref.startsWith("http")) {
+    if (!absoluteHref.startsWith("http") || !isOfficialInstitutionUrl(absoluteHref)) {
       return;
     }
 
@@ -201,8 +210,8 @@ export function parseProgramFromSource(
   const metaDescription =
     $?.('meta[name="description"]').attr("content")?.trim() ||
     String(parsedFallback.summary ?? source.description ?? "");
-  const statusInfo = getStatusFromText(bodyText || metaDescription, source.type);
-  const candidateCloseDate = parseFrenchDateFromText(bodyText);
+  const candidateCloseDate = parseRelevantFrenchDeadlineFromText(bodyText || metaDescription);
+  const statusInfo = getStatusFromText(bodyText || metaDescription, source.type, Boolean(candidateCloseDate));
 
   const applicantTypes = Array.from(
     new Set([
@@ -257,7 +266,7 @@ export function parseProgramFromSource(
   if (statusInfo.status !== ProgramStatus.OPEN && source.type === SourceType.OFFICIAL) {
     reviewFields.push("status");
   }
-  if (source.type === SourceType.AGGREGATOR) {
+  if (source.type === SourceType.AGGREGATOR || !isOfficialInstitutionUrl(source.url)) {
     reviewFields.push("verification_officielle");
   }
 
@@ -271,14 +280,11 @@ export function parseProgramFromSource(
     name: pageTitle,
     organization: String(parsedFallback.organization ?? source.name),
     summary: metaDescription,
-    officialUrl: directOfficialUrl,
-    sourceLandingUrl: source.url,
+    officialUrl: isOfficialInstitutionUrl(directOfficialUrl) ? directOfficialUrl : source.url,
+    sourceLandingUrl: isOfficialInstitutionUrl(source.url) ? source.url : null,
     governmentLevel: String(parsedFallback.governmentLevel ?? source.governmentLevel ?? "A confirmer"),
     region: String(parsedFallback.region ?? "Quebec"),
-    status:
-      source.type === SourceType.OFFICIAL
-        ? statusInfo.status
-        : ProgramStatus.REVIEW,
+    status: source.type === SourceType.OFFICIAL ? statusInfo.status : ProgramStatus.REVIEW,
     confidence,
     details,
     eligibilityNotes,
