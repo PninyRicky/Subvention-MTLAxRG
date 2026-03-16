@@ -34,13 +34,21 @@ type ProgramWithWindow = FundingProgram & {
   }[];
 };
 
+function normalizeComparableText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function overlap(left: string[], right: string[]) {
   if (!left.length || !right.length) {
     return 0;
   }
 
-  const rightSet = new Set(right.map((item) => item.toLowerCase()));
-  const matches = left.filter((item) => rightSet.has(item.toLowerCase()));
+  const rightSet = new Set(right.map((item) => normalizeComparableText(item)));
+  const matches = left.filter((item) => rightSet.has(normalizeComparableText(item)));
   return matches.length / Math.max(left.length, right.length);
 }
 
@@ -55,7 +63,8 @@ function containsExcludedKeyword(program: ProgramWithWindow, excludedKeywords: s
     .join(" ")
     .toLowerCase();
 
-  return excludedKeywords.some((keyword) => haystack.includes(keyword.toLowerCase()));
+  const normalizedHaystack = normalizeComparableText(haystack);
+  return excludedKeywords.some((keyword) => normalizedHaystack.includes(normalizeComparableText(keyword)));
 }
 
 function getDeadlineScore(program: ProgramWithWindow) {
@@ -122,7 +131,7 @@ export function scoreProgramForProfile(program: ProgramWithWindow, profile: Serv
 
   const applicantScore = overlap(program.applicantTypes, criteria.applicantTypes ?? []);
   const geographyScore = criteria.geography?.some((entry) =>
-    [program.region, program.governmentLevel].join(" ").toLowerCase().includes(entry.toLowerCase()),
+    normalizeComparableText([program.region, program.governmentLevel].join(" ")).includes(normalizeComparableText(entry)),
   )
     ? 1
     : 0;

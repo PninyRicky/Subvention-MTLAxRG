@@ -183,9 +183,33 @@ export const defaultProfiles: ProfileSeed[] = [
     criteria: {
       applicantTypes: ["OBNL", "Organisme communautaire"],
       geography: ["Quebec", "Canada"],
-      sectors: ["marketing numerique", "branding", "rayonnement", "communications"],
+      sectors: [
+        "marketing numerique",
+        "branding",
+        "rayonnement",
+        "communications",
+        "promotion",
+        "visibilite",
+        "developpement organisationnel",
+        "developpement numerique",
+        "mediation",
+        "participation culturelle",
+      ],
       projectStages: ["developpement", "production", "diffusion"],
-      eligibleExpenses: ["branding", "photo", "video", "site web", "marketing"],
+      eligibleExpenses: [
+        "branding",
+        "photo",
+        "video",
+        "site web",
+        "marketing",
+        "communications",
+        "promotion",
+        "rayonnement",
+        "contenu numerique",
+        "developpement numerique",
+        "fonctionnement",
+        "mediation",
+      ],
       excludedKeywords: ["capital", "immobilier lourd"],
     },
     weights: {
@@ -415,6 +439,308 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       maxAmount: "Selon le programme",
       maxCoveragePct: null,
       openStatusReason: "Portail officiel Patrimoine canadien. Les dates doivent etre confirmees sur la fiche detaillee du programme cible.",
+    },
+  },
+  {
+    name: "Patrimoine canadien - Développement des communautés par le biais des arts et du patrimoine",
+    url: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/developpement-communautes.html",
+    type: "OFFICIAL",
+    governmentLevel: "Federal",
+    description: "Programme officiel fédéral pour festivals, événements et projets patrimoniaux ou artistiques communautaires.",
+    fallbackPayload: {
+      name: "Patrimoine canadien - Développement des communautés par le biais des arts et du patrimoine",
+      organization: "Patrimoine canadien",
+      summary:
+        "Programme fédéral destiné aux groupes locaux pour des festivals, événements et projets qui célèbrent l’histoire, le patrimoine et la participation culturelle d’une communauté.",
+      officialUrl: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/developpement-communautes.html",
+      governmentLevel: "Federal",
+      region: "Canada",
+      status: "REVIEW",
+      confidence: 76,
+      details:
+        "Le programme Développement des communautés par le biais des arts et du patrimoine offre plusieurs volets et peut convenir à des organismes sans but lucratif qui misent sur le rayonnement, les publics et la mobilisation culturelle locale.",
+      eligibilityNotes:
+        "Vise des groupes locaux et organismes qui portent des festivals, événements, expositions ou projets patrimoniaux et artistiques à portée communautaire. Il ne finance pas de simples opérations marketing, mais peut soutenir des projets qui incluent du contenu, de la diffusion et du rayonnement.",
+      applicationNotes:
+        "Le scan doit distinguer le volet exact, confirmer la date limite active et pointer vers la fiche détaillée du volet lorsqu’elle est détectée.",
+      applicantTypes: ["OBNL", "Organisme communautaire", "Organisme culturel", "Municipalité"],
+      sectors: ["culture", "patrimoine", "rayonnement", "participation culturelle"],
+      projectStages: ["developpement", "production", "diffusion"],
+      eligibleExpenses: ["diffusion", "contenu culturel", "rayonnement", "mediation"],
+      maxAmount: "Selon le volet",
+      maxCoveragePct: null,
+      openStatusReason:
+        "Programme officiel Patrimoine canadien confirmé. Le statut final doit être validé au niveau du volet actif et de ses dates.",
+    },
+  },
+  {
+    name: "Patrimoine canadien - Initiatives stratégiques du Fonds du Canada pour l’investissement en culture",
+    url: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture/initiatives-strategiques.html",
+    type: "OFFICIAL",
+    governmentLevel: "Federal",
+    description: "Programme officiel fédéral pour améliorer les pratiques d’affaires, les revenus et les capacités d’organismes artistiques et patrimoniaux.",
+    fallbackPayload: {
+      name: "Patrimoine canadien - Initiatives stratégiques du Fonds du Canada pour l’investissement en culture",
+      organization: "Patrimoine canadien",
+      summary:
+        "Volet fédéral destiné aux projets partenariaux qui renforcent les opérations, les pratiques d’affaires, les revenus et l’usage stratégique des technologies dans les organismes artistiques et patrimoniaux.",
+      officialUrl:
+        "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture/initiatives-strategiques.html",
+      governmentLevel: "Federal",
+      region: "Canada",
+      status: "REVIEW",
+      confidence: 82,
+      details:
+        "Ce volet est particulièrement pertinent pour des organismes qui veulent structurer leur développement, moderniser leurs pratiques ou mutualiser des ressources, incluant un angle numérique ou de rayonnement organisationnel.",
+      eligibilityNotes:
+        "Le demandeur doit être un organisme à but non lucratif ou équivalent lié aux arts ou au patrimoine, souvent avec un projet partenarial. Ce n’est pas un programme de promotion simple, mais il peut financer des projets de transformation et de développement organisationnel reliés au service Essence de marque.",
+      applicationNotes:
+        "Toujours relire les lignes directrices et confirmer la date de dépôt active. Le scan doit privilégier la fiche détaillée du volet plutôt que le portail général de Patrimoine canadien.",
+      applicantTypes: ["OBNL", "Organisme culturel", "Organisme patrimonial"],
+      sectors: ["developpement organisationnel", "communications", "rayonnement", "developpement numerique"],
+      projectStages: ["developpement"],
+      eligibleExpenses: ["developpement numerique", "communications", "strategie", "rayonnement"],
+      maxAmount: "Selon le projet",
+      maxCoveragePct: null,
+      openStatusReason:
+        "Le programme officiel existe et vise explicitement l’amélioration des pratiques d’affaires et l’usage stratégique des technologies; les dates doivent être confirmées sur la page courante.",
+    },
+  },
+  {
+    name: "CAC - Subventions de base aux organismes",
+    url: "https://conseildesarts.ca/financement/subventions/subventions-de-base-aux-organismes",
+    type: "OFFICIAL",
+    governmentLevel: "Federal",
+    description: "Programme officiel du Conseil des arts du Canada pour le financement stable des organismes artistiques.",
+    fallbackPayload: {
+      name: "CAC - Subventions de base aux organismes",
+      organization: "Conseil des arts du Canada",
+      summary:
+        "Programme fédéral de financement pluriannuel destiné à offrir un financement stable aux organismes artistiques et de soutien.",
+      officialUrl: "https://conseildesarts.ca/financement/subventions/subventions-de-base-aux-organismes",
+      governmentLevel: "Federal",
+      region: "Canada",
+      status: "REVIEW",
+      confidence: 74,
+      details:
+        "Cette source est pertinente pour les organismes artistiques et culturels qui cherchent à consolider leurs capacités et leur fonctionnement sur plusieurs années.",
+      eligibilityNotes:
+        "Pertinent pour des organismes artistiques admissibles déjà structurés. Ce n’est pas une subvention de campagne marketing, mais elle peut soutenir le fonctionnement global et donc indirectement des dépenses liées au rayonnement et aux communications.",
+      applicationNotes:
+        "Le scan doit confirmer le programme ou la composante réellement ouverte et conserver le lien détaillé du CAC.",
+      applicantTypes: ["OBNL", "Organisme culturel"],
+      sectors: ["culture", "arts", "developpement organisationnel", "rayonnement"],
+      projectStages: ["developpement", "diffusion"],
+      eligibleExpenses: ["fonctionnement", "communications", "rayonnement", "developpement organisationnel"],
+      maxAmount: "Selon l’organisme",
+      maxCoveragePct: null,
+      openStatusReason:
+        "Programme officiel du CAC pertinent pour la capacité organisationnelle; le statut courant doit être validé selon la composante et le calendrier officiel.",
+    },
+  },
+  {
+    name: "Québec - Mécénat Placements Culture",
+    url: "https://www.quebec.ca/culture/aide-financiere/mecenat-culture",
+    type: "OFFICIAL",
+    governmentLevel: "Quebec",
+    description: "Programme officiel du Québec pour l’autonomie financière des OBNL des domaines de la culture et des communications.",
+    fallbackPayload: {
+      name: "Québec - Mécénat Placements Culture",
+      organization: "Gouvernement du Québec",
+      summary:
+        "Programme québécois destiné aux organismes à but non lucratif des domaines de la culture et des communications pour soutenir leur autonomie financière et leurs collectes de fonds.",
+      officialUrl: "https://www.quebec.ca/culture/aide-financiere/mecenat-culture/programme-mecenat-placements-culture",
+      governmentLevel: "Quebec",
+      region: "Quebec",
+      status: "OPEN",
+      confidence: 84,
+      details:
+        "Le programme vise explicitement les organismes à but non lucratif des domaines de la culture et des communications et accepte des demandes en continu selon Québec.ca.",
+      eligibilityNotes:
+        "Pertinent surtout pour des OBNL culturels ou en communications. Ce n’est pas un programme de branding direct, mais il soutient la capacité financière et les campagnes de financement, ce qui peut cadrer avec un mandat de structuration de marque ou de rayonnement dans une stratégie plus large.",
+      applicationNotes:
+        "Québec.ca indique qu’une demande peut être déposée en tout temps. Le scan peut donc le traiter comme ouvert tant qu’aucun avis officiel contraire n’est publié.",
+      applicantTypes: ["OBNL", "Organisme culturel"],
+      sectors: ["communications", "culture", "developpement organisationnel", "rayonnement"],
+      projectStages: ["developpement"],
+      eligibleExpenses: ["collecte de fonds", "developpement organisationnel", "communications"],
+      maxAmount: "Selon le volet",
+      maxCoveragePct: null,
+      openStatusReason:
+        "La page officielle Québec.ca mentionne qu’une demande d’aide financière peut être déposée en tout temps au cours de l’année.",
+      intakeWindow: {
+        rolling: true,
+      },
+    },
+  },
+  {
+    name: "Québec - Aide aux initiatives de partenariat",
+    url: "https://www.quebec.ca/culture/aide-financiere/initiatives-de-partenariat/aide-aux-initiatives-de-partenariat",
+    type: "OFFICIAL",
+    governmentLevel: "Quebec",
+    description: "Programme officiel du Québec pour des ententes et projets structurants en culture et communications.",
+    fallbackPayload: {
+      name: "Québec - Aide aux initiatives de partenariat",
+      organization: "Gouvernement du Québec",
+      summary:
+        "Programme québécois qui vise à soutenir le développement de la culture et des communications par la concertation et des initiatives partenariales.",
+      officialUrl:
+        "https://www.quebec.ca/culture/aide-financiere/initiatives-de-partenariat/aide-aux-initiatives-de-partenariat",
+      governmentLevel: "Quebec",
+      region: "Quebec",
+      status: "REVIEW",
+      confidence: 74,
+      details:
+        "Cette aide est pertinente pour des projets partenariaux et structurants pouvant inclure du rayonnement, des communications, des contenus ou des outils de développement du milieu.",
+      eligibilityNotes:
+        "Le fit exact dépend du partenaire visé et de la nature du projet. Elle peut mieux convenir à des démarches concertées qu’à un mandat isolé de production.",
+      applicationNotes:
+        "Le scan doit identifier si un appel, une entente ou un volet actif est publié sur la page officielle et en extraire les dates.",
+      applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+      sectors: ["communications", "culture", "rayonnement", "partenariat"],
+      projectStages: ["developpement", "diffusion"],
+      eligibleExpenses: ["communications", "rayonnement", "contenu numerique", "mediation"],
+      maxAmount: "Selon le partenariat",
+      maxCoveragePct: null,
+      openStatusReason:
+        "La page officielle confirme l’existence du programme; le statut actif doit être vérifié à partir de l’appel ou de l’entente en vigueur.",
+    },
+  },
+  {
+    name: "Québec - Aide au fonctionnement pour les organismes de regroupement",
+    url: "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/organismes-regroupement/programme-aide-au-fonctionnement-pour-les-organismes-de-regroupement-pafor",
+    type: "OFFICIAL",
+    governmentLevel: "Quebec",
+    description: "Programme officiel du Québec pour les organismes de regroupement des milieux culturels et des communications.",
+    fallbackPayload: {
+      name: "Québec - Aide au fonctionnement pour les organismes de regroupement",
+      organization: "Gouvernement du Québec",
+      summary:
+        "Programme québécois destiné aux organismes de regroupement qui offrent des services d’expertise-conseil, de communication, de regroupement, de formation et de développement.",
+      officialUrl:
+        "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/organismes-regroupement/programme-aide-au-fonctionnement-pour-les-organismes-de-regroupement-pafor",
+      governmentLevel: "Quebec",
+      region: "Quebec",
+      status: "REVIEW",
+      confidence: 80,
+      details:
+        "Ce programme est très pertinent pour la logique Essence de marque lorsqu’un regroupement cherche à renforcer ses communications, ses services à ses membres et son développement.",
+      eligibilityNotes:
+        "S’adresse à des personnes morales à but non lucratif comme des organismes de regroupement ou coopératives. Il ne vise pas tous les OBNL individuellement, mais c’est une source importante pour des mandats de communication et de développement au bénéfice d’un secteur.",
+      applicationNotes:
+        "Québec.ca indique une date de dépôt fermée pour l’édition 2025; le scan doit surveiller la prochaine ouverture annuelle plutôt que le traiter comme toujours ouvert.",
+      applicantTypes: ["OBNL", "Cooperative", "Organisme de regroupement"],
+      sectors: ["communications", "developpement organisationnel", "formation", "rayonnement"],
+      projectStages: ["developpement"],
+      eligibleExpenses: ["communications", "developpement organisationnel", "formation", "mutualisation"],
+      maxAmount: "Selon le programme",
+      maxCoveragePct: 100,
+      openStatusReason:
+        "La page officielle confirme le programme, mais Québec.ca indique que la période de dépôt 2025 est terminée; l’ouverture de la prochaine édition doit être confirmée.",
+    },
+  },
+  {
+    name: "Québec - Aide au fonctionnement pour les organismes culturels d’action communautaire",
+    url: "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/aide-au-fonctionnement-pour-les-organismes-culturels-daction-communautaire",
+    type: "OFFICIAL",
+    governmentLevel: "Quebec",
+    description: "Programme officiel du Québec pour les organismes culturels d’action communautaire.",
+    fallbackPayload: {
+      name: "Québec - Aide au fonctionnement pour les organismes culturels d’action communautaire",
+      organization: "Gouvernement du Québec",
+      summary:
+        "Programme québécois destiné aux organismes culturels d’action communautaire afin de soutenir leur offre de services adaptée aux communautés et groupes qui rencontrent des obstacles à la participation culturelle.",
+      officialUrl:
+        "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/aide-au-fonctionnement-pour-les-organismes-culturels-daction-communautaire",
+      governmentLevel: "Quebec",
+      region: "Quebec",
+      status: "REVIEW",
+      confidence: 78,
+      details:
+        "Programme particulièrement pertinent pour des OBNL culturels ou communautaires qui misent sur l’accessibilité, la médiation, la participation et le rayonnement auprès de publics ciblés.",
+      eligibilityNotes:
+        "Convient aux organismes culturels d’action communautaire. Peut mieux cadrer avec des livrables de contenu, narration, image de marque et diffusion lorsqu’ils s’inscrivent dans l’offre de services et la participation culturelle de l’organisme.",
+      applicationNotes:
+        "Le scan doit confirmer la fenêtre de dépôt active et toute mise à jour du programme sur Québec.ca.",
+      applicantTypes: ["OBNL", "Organisme culturel", "Organisme communautaire"],
+      sectors: ["culture", "participation culturelle", "mediation", "rayonnement"],
+      projectStages: ["developpement", "diffusion"],
+      eligibleExpenses: ["fonctionnement", "communications", "mediation", "rayonnement"],
+      maxAmount: "Selon le programme",
+      maxCoveragePct: null,
+      openStatusReason:
+        "La page officielle confirme le programme, mais la période de dépôt active doit être revalidée lors de chaque scan.",
+    },
+  },
+  {
+    name: "Longueuil - Programmes d’aide financières aux ménages et organismes",
+    url: "https://www.longueuil.quebec/fr/services/developpement-social/programmes-daide-financieres-aux-menages-et-organismes",
+    type: "OFFICIAL",
+    governmentLevel: "Municipal",
+    description: "Portail officiel de la Ville de Longueuil pour les programmes d’aide destinés aux organismes et au développement social.",
+    fallbackPayload: {
+      name: "Longueuil - Programme de soutien au développement social",
+      organization: "Ville de Longueuil",
+      summary:
+        "Programme municipal permettant aux organismes reconnus de réaliser des projets qui améliorent la qualité de vie de la population et renforcent la vitalité des communautés.",
+      officialUrl:
+        "https://www.longueuil.quebec/fr/services/developpement-social/programmes-daide-financieres-aux-menages-et-organismes",
+      governmentLevel: "Municipal",
+      region: "Montérégie",
+      status: "REVIEW",
+      confidence: 72,
+      details:
+        "Cette source est utile pour des OBNL communautaires, culturels ou sociaux qui souhaitent développer leur offre, leur visibilité locale ou leur capacité d’action sur le territoire de Longueuil.",
+      eligibilityNotes:
+        "Le programme vise des organismes reconnus par la Ville de Longueuil. Le fit exact dépend du volet actif et des priorités annuelles du développement social ou communautaire.",
+      applicationNotes:
+        "Le scan doit distinguer le programme, l’édition active et les dates de dépôt directement depuis la page officielle de Longueuil.",
+      applicantTypes: ["OBNL", "Organisme communautaire", "Organisme culturel"],
+      sectors: ["developpement social", "organismes", "rayonnement", "developpement organisationnel"],
+      projectStages: ["developpement", "diffusion"],
+      eligibleExpenses: ["communications", "rayonnement", "developpement organisationnel", "projet communautaire"],
+      maxAmount: "Selon le programme",
+      maxCoveragePct: null,
+      openStatusReason:
+        "Le portail officiel Longueuil est confirmé, mais l’ouverture du volet courant doit être relue sur la page active.",
+    },
+  },
+  {
+    name: "Ville de Saguenay - Programme de soutien aux projets spéciaux",
+    url: "https://ville.saguenay.ca/activites-et-loisirs/arts-et-culture/projets-sp%C3%A9ciaux/programme-de-soutien-aux-projets-sp%C3%A9ciaux",
+    type: "OFFICIAL",
+    governmentLevel: "Municipal",
+    description: "Programme officiel de la Ville de Saguenay pour des projets spéciaux en arts et culture.",
+    fallbackPayload: {
+      name: "Ville de Saguenay - Programme de soutien aux projets spéciaux",
+      organization: "Ville de Saguenay",
+      summary:
+        "Programme municipal visant des initiatives culturelles collaboratives, participatives et de rayonnement, dans le cadre de l’Entente de développement culturel de Saguenay.",
+      officialUrl:
+        "https://ville.saguenay.ca/activites-et-loisirs/arts-et-culture/projets-sp%C3%A9ciaux/programme-de-soutien-aux-projets-sp%C3%A9ciaux",
+      governmentLevel: "Municipal",
+      region: "Saguenay-Lac-Saint-Jean",
+      status: "CLOSED",
+      confidence: 88,
+      details:
+        "La page officielle indique une ouverture le 1er décembre 2025 et une date limite d’inscription au dimanche 1er février 2026, avec des volets de médiation, rayonnement et accessibilité au public.",
+      eligibilityNotes:
+        "Pertinent pour des organismes culturels et communautaires, ainsi que des projets visant l’élargissement des publics et le rayonnement des artistes et des organisations de Saguenay.",
+      applicationNotes:
+        "Au 16 mars 2026, la date limite du 1er février 2026 est dépassée; l’appel doit être considéré fermé jusqu’à nouvelle publication officielle.",
+      applicantTypes: ["OBNL", "Organisme culturel", "Organisme communautaire"],
+      sectors: ["culture", "mediation", "rayonnement", "participation culturelle"],
+      projectStages: ["developpement", "production", "diffusion"],
+      eligibleExpenses: ["mediation", "rayonnement", "diffusion", "activite artistique"],
+      maxAmount: "Selon le volet",
+      maxCoveragePct: null,
+      openStatusReason:
+        "La page officielle Saguenay mentionne une date limite au 1er février 2026; le programme est traité comme fermé au 16 mars 2026.",
+      intakeWindow: {
+        rolling: false,
+        opensAt: "2025-12-01T00:00:00.000Z",
+        closesAt: "2026-02-01T23:59:00.000Z",
+      },
     },
   },
   {

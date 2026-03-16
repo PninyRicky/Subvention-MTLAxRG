@@ -320,10 +320,15 @@ async function ensureSourcePrograms() {
 }
 
 async function runBootstrap() {
-  await prisma.serviceProfile.createMany({
-    data: defaultProfiles,
-    skipDuplicates: true,
-  });
+  for (const profile of defaultProfiles) {
+    await prisma.serviceProfile.upsert({
+      where: {
+        name: profile.name,
+      },
+      update: profile,
+      create: profile,
+    });
+  }
 
   await removeUnofficialRecords();
 

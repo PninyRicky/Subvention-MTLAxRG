@@ -166,6 +166,23 @@ const genericProgramKeywords = [
   "regions",
   "mesures",
   "organismes",
+  "organisme",
+  "communautaire",
+  "communication",
+  "communications",
+  "numerique",
+  "numérique",
+  "rayonnement",
+  "promotion",
+  "visibilite",
+  "visibilité",
+  "developpement",
+  "développement",
+  "fonctionnement",
+  "partenariat",
+  "social",
+  "mediation",
+  "médiation",
 ];
 
 const lowValueLinkKeywords = ["contact", "nous joindre", "accueil", "a propos", "carriere", "carrieres"];
