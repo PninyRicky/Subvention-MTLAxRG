@@ -3,6 +3,7 @@ const fallbackSecret = "mtla-dev-secret-change-me";
 export const env = {
   appUrl: process.env.NEXTAUTH_URL ?? "http://localhost:3000",
   authSecret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? fallbackSecret,
+  resendApiKey: process.env.RESEND_API_KEY,
   smtpHost: process.env.SMTP_HOST,
   smtpPort: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
   smtpUser: process.env.SMTP_USER,
@@ -17,3 +18,5 @@ export const hasSmtpConfig =
   Boolean(env.smtpPort) &&
   Boolean(env.smtpUser) &&
   Boolean(env.smtpPassword);
+
+export const hasResendConfig = Boolean(env.resendApiKey) && Boolean(env.smtpFrom);

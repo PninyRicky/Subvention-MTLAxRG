@@ -24,6 +24,7 @@ Copier `.env.example` vers `.env.local` puis remplir:
 DATABASE_URL="postgresql://..."
 AUTH_SECRET="..."
 NEXTAUTH_URL="http://localhost:3000"
+RESEND_API_KEY=""
 SMTP_HOST=""
 SMTP_PORT=""
 SMTP_USER=""
@@ -36,6 +37,7 @@ DEV_AUTH_BYPASS="false"
 Notes:
 
 - `DATABASE_URL` est requis pour utiliser Prisma en runtime.
+- `RESEND_API_KEY` est la voie recommandee en production pour les magic links.
 - si SMTP n’est pas configure en local, le magic link est logge en console.
 - `DEV_AUTH_BYPASS=true` permet d’ouvrir l’app sans session pour du dev local.
 

@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import nodemailer from "nodemailer";
 
-import { env, hasSmtpConfig } from "@/lib/env";
+import { env, hasResendConfig, hasSmtpConfig } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 async function sendVerificationRequest({
@@ -17,6 +17,31 @@ async function sendVerificationRequest({
   url: string;
   provider: { from?: string };
 }) {
+  if (hasResendConfig) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: provider.from ?? env.smtpFrom,
+        to: [identifier],
+        subject: "Connexion MTLA Subventions",
+        text: `Votre lien de connexion: ${url}`,
+        html: `<p>Votre lien de connexion MTLA Subventions:</p><p><a href="${url}">${url}</a></p>`,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Erreur Resend", errorText);
+      throw new Error(`Resend a refuse l'envoi: ${errorText}`);
+    }
+
+    return;
+  }
+
   const transport = hasSmtpConfig
     ? nodemailer.createTransport({
         host: env.smtpHost,
