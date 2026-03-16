@@ -12,6 +12,7 @@ import {
   useMap,
 } from "react-leaflet";
 
+import { GoogleTerritoryMap } from "@/components/google-territory-map";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { TerritoryData, TerritoryGeometry } from "@/lib/territories";
@@ -120,7 +121,7 @@ function TerritoryViewportController({
   return null;
 }
 
-function InteractiveTerritoryMap({ territory }: { territory: TerritoryData }) {
+function LeafletTerritoryMap({ territory }: { territory: TerritoryData }) {
   const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"territory" | "province" | "municipality">("territory");
 
@@ -295,6 +296,11 @@ function InteractiveTerritoryMap({ territory }: { territory: TerritoryData }) {
 
 export function TerritoryMapClient({ territory }: { territory: TerritoryData }) {
   const mapKey = `${territory.kind}:${territory.territoryCode ?? territory.name}:${territory.label}`;
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
 
-  return <InteractiveTerritoryMap key={mapKey} territory={territory} />;
+  if (googleMapsApiKey) {
+    return <GoogleTerritoryMap key={mapKey} territory={territory} apiKey={googleMapsApiKey} />;
+  }
+
+  return <LeafletTerritoryMap key={mapKey} territory={territory} />;
 }
