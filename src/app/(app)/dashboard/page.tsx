@@ -41,11 +41,36 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       <section className="grid gap-4 lg:grid-cols-5">
-        <StatCard label="Programmes ouverts" value={stats.openPrograms} hint="Programmes actuellement détectés comme ouverts aujourd'hui." />
-        <StatCard label="À vérifier" value={stats.reviewPrograms} hint="Programmes ambigus ou signalés sans validation définitive." />
-        <StatCard label="Matches éligibles" value={stats.eligibleMatches} hint="Associations fortes entre programmes et profils actifs." />
-        <StatCard label="File de revue" value={stats.reviewQueue} hint="Éléments qui demandent une validation humaine avant usage." />
-        <StatCard label="Profils actifs" value={stats.activeProfiles} hint="Profils de sélection actuellement pris en compte dans le score." />
+        <StatCard
+          label="Programmes ouverts"
+          value={stats.openPrograms}
+          hint="Programmes actuellement détectés comme ouverts aujourd'hui."
+          href="/programmes?status=OPEN"
+        />
+        <StatCard
+          label="À vérifier"
+          value={stats.reviewPrograms}
+          hint="Programmes ambigus ou signalés sans validation définitive."
+          href="/programmes?status=REVIEW"
+        />
+        <StatCard
+          label="Matches éligibles"
+          value={stats.eligibleMatches}
+          hint="Associations fortes entre programmes et profils actifs."
+          href="/programmes?match=ELIGIBLE"
+        />
+        <StatCard
+          label="File de revue"
+          value={stats.reviewQueue}
+          hint="Éléments qui demandent une validation humaine avant usage."
+          href="/programmes?reviewQueue=1"
+        />
+        <StatCard
+          label="Profils actifs"
+          value={stats.activeProfiles}
+          hint="Profils de sélection actuellement pris en compte dans le score."
+          href="/profils"
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">

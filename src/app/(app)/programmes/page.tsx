@@ -15,6 +15,8 @@ type SearchParams = Promise<{
   level?: string;
   favorites?: string;
   institution?: string;
+  match?: string;
+  reviewQueue?: string;
 }>;
 
 export default async function ProgrammesPage({
@@ -25,6 +27,8 @@ export default async function ProgrammesPage({
   const params = await searchParams;
   const query = params.q?.trim();
   const institution = params.institution?.trim();
+  const matchEligible = params.match === "ELIGIBLE";
+  const reviewQueueOnly = params.reviewQueue === "1";
   const status =
     params.status && Object.values(ProgramStatus).includes(params.status as ProgramStatus)
       ? (params.status as ProgramStatus)
@@ -37,6 +41,8 @@ export default async function ProgrammesPage({
     where: {
       ...(institutionWhere ?? {}),
       ...(status ? { status } : {}),
+      ...(matchEligible ? { matchResults: { some: { status: MatchStatus.ELIGIBLE } } } : {}),
+      ...(reviewQueueOnly ? { reviews: { some: { status: "PENDING" } } } : {}),
       ...(params.favorites === "1" ? { isFavorite: true } : {}),
       ...(params.level ? { governmentLevel: params.level } : {}),
       ...(query
@@ -120,6 +126,16 @@ export default async function ProgrammesPage({
             {activeInstitution ? (
               <p className="mt-3 text-sm leading-6 text-black/58">
                 Filtre actif: <span className="font-medium text-black">{activeInstitution.label}</span>
+              </p>
+            ) : null}
+            {matchEligible ? (
+              <p className="mt-3 text-sm leading-6 text-black/58">
+                Filtre actif: <span className="font-medium text-black">Matches éligibles</span>
+              </p>
+            ) : null}
+            {reviewQueueOnly ? (
+              <p className="mt-3 text-sm leading-6 text-black/58">
+                Filtre actif: <span className="font-medium text-black">File de revue</span>
               </p>
             ) : null}
           </div>
