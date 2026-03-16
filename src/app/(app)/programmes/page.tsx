@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
+import { buildInstitutionProgramWhere, getInstitutionConfig, getInstitutionNavLinks } from "@/lib/institutions";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ type SearchParams = Promise<{
   q?: string;
   level?: string;
   favorites?: string;
+  institution?: string;
 }>;
 
 export default async function ProgrammesPage({
@@ -24,13 +26,18 @@ export default async function ProgrammesPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim();
+  const institution = params.institution?.trim();
   const status =
     params.status && Object.values(ProgramStatus).includes(params.status as ProgramStatus)
       ? (params.status as ProgramStatus)
       : undefined;
+  const institutionWhere = institution ? buildInstitutionProgramWhere(institution) : null;
+  const institutionLinks = await getInstitutionNavLinks();
+  const activeInstitution = institution ? getInstitutionConfig(institution) : null;
 
   const programs = await prisma.fundingProgram.findMany({
     where: {
+      ...(institutionWhere ?? {}),
       ...(status ? { status } : {}),
       ...(params.favorites === "1" ? { isFavorite: true } : {}),
       ...(params.level ? { governmentLevel: params.level } : {}),
@@ -92,9 +99,14 @@ export default async function ProgrammesPage({
             <p className="mt-3 max-w-2xl text-sm leading-6 text-black/66">
               Vue détaillée des programmes détectés, avec filtres rapides, score par profil et statut d’ouverture.
             </p>
+            {activeInstitution ? (
+              <p className="mt-3 text-sm leading-6 text-black/58">
+                Filtre actif: <span className="font-medium text-black">{activeInstitution.label}</span>
+              </p>
+            ) : null}
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-[1.45fr_0.8fr_0.8fr_0.8fr_auto]">
+          <form className="grid gap-3 sm:grid-cols-[1.45fr_0.8fr_0.8fr_0.8fr_1fr_auto]">
             <input
               type="search"
               name="q"
@@ -119,7 +131,7 @@ export default async function ProgrammesPage({
             >
               <option value="">Tous les niveaux</option>
               <option value="Quebec">Québec</option>
-              <option value="Federal">Federal</option>
+              <option value="Federal">Fédéral</option>
               <option value="Municipal">Municipal</option>
               <option value="Regional">Régional</option>
               <option value="Canada">Canada</option>
@@ -131,6 +143,18 @@ export default async function ProgrammesPage({
             >
               <option value="">Tous</option>
               <option value="1">Favoris seulement</option>
+            </select>
+            <select
+              name="institution"
+              defaultValue={params.institution ?? ""}
+              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
+            >
+              <option value="">Toutes les institutions</option>
+              {institutionLinks.map((link) => (
+                <option key={link.slug} value={link.slug}>
+                  {link.label}
+                </option>
+              ))}
             </select>
             <button className="h-11 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-[color:var(--accent)]">
               Filtrer
@@ -150,7 +174,7 @@ export default async function ProgrammesPage({
                 <th className="px-6 py-4 font-medium">Date limite</th>
                 <th className="px-6 py-4 font-medium">Meilleur match</th>
                 <th className="px-6 py-4 font-medium">Source</th>
-                <th className="px-6 py-4 font-medium">Mise a jour</th>
+                <th className="px-6 py-4 font-medium">Mise à jour</th>
               </tr>
             </thead>
             <tbody>

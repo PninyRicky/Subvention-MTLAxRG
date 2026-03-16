@@ -1,5 +1,7 @@
 import { ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceRegistry } from "@prisma/client";
 
+import { analyzeProgramPage } from "@/lib/ai/analyzer";
+import { isAiEnabled } from "@/lib/ai/provider";
 import { env } from "@/lib/env";
 import { parseProgramFromSource } from "@/lib/fetch/parsers";
 import { resolveWorkingOfficialUrls } from "@/lib/link-validation";
@@ -103,10 +105,39 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       const rawContent = html ?? JSON.stringify(source.fallbackPayload ?? {});
       const contentHash = hashContent(rawContent);
 
+      let aiAnalysis: Awaited<ReturnType<typeof analyzeProgramPage>> | null = null;
+      if (isAiEnabled()) {
+        const existingDoc = await prisma.sourceDocument.findFirst({
+          where: { sourceId: source.id, contentHash },
+          orderBy: { fetchedAt: "desc" },
+        });
+
+        const existingAi = existingDoc
+          ? await prisma.fundingProgram.findFirst({
+              where: { sourceId: source.id, aiAnalyzedAt: { not: null } },
+              select: { aiAnalysis: true },
+            })
+          : null;
+
+        if (existingAi?.aiAnalysis) {
+          aiAnalysis = existingAi.aiAnalysis as Awaited<ReturnType<typeof analyzeProgramPage>>;
+        } else {
+          const bodyText = html
+            ? html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+            : JSON.stringify(source.fallbackPayload ?? {});
+          aiAnalysis = await analyzeProgramPage(bodyText, {
+            sourceName: source.name,
+            sourceUrl: source.url,
+            governmentLevel: source.governmentLevel ?? "A confirmer",
+          });
+        }
+      }
+
       const parsed = parseProgramFromSource(
         source,
         html,
         (source.fallbackPayload ?? null) as Record<string, unknown> | null,
+        aiAnalysis,
       );
       const resolvedUrls = await resolveWorkingOfficialUrls({
         officialUrl: parsed.officialUrl,
@@ -161,6 +192,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
           openStatusReason: parsed.openStatusReason,
           sourceId: source.id,
           lastVerifiedAt: new Date(),
+          ...(aiAnalysis ? { aiAnalysis, aiAnalyzedAt: new Date() } : {}),
         },
         create: {
           slug: parsed.slug,
@@ -185,6 +217,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
           openStatusReason: parsed.openStatusReason,
           sourceId: source.id,
           lastVerifiedAt: new Date(),
+          ...(aiAnalysis ? { aiAnalysis, aiAnalyzedAt: new Date() } : {}),
         },
       });
 

@@ -34,11 +34,13 @@ export function AppShell({
   children,
   userLabel,
   action,
+  institutionLinks = [],
   mrcLinks = [],
 }: {
   children: React.ReactNode;
   userLabel: string;
   action?: React.ReactNode;
+  institutionLinks?: { slug: string; label: string; count: number; href: string }[];
   mrcLinks?: { slug: string; name: string; count: number; href: string }[];
 }) {
   const pathname = usePathname();
@@ -85,44 +87,78 @@ export function AppShell({
                     <span>{item.label}</span>
                   </Link>
 
-                  {item.href === "/programmes" && mrcLinks.length > 0 ? (
+                  {item.href === "/programmes" && (institutionLinks.length > 0 || mrcLinks.length > 0) ? (
                     <div className="ml-6 mt-2 border-l border-black/10 pl-3">
-                      <Link
-                        href="/mrcs"
-                        className={cn(
-                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs transition",
-                          pathname === "/mrcs"
-                            ? "bg-black/[0.06] text-black"
-                            : "text-black/60 hover:bg-black/[0.03] hover:text-black",
-                        )}
-                      >
-                        <MapPinned className="h-3.5 w-3.5" />
-                        <span className="uppercase tracking-[0.16em]">MRC</span>
-                      </Link>
+                      {institutionLinks.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="px-3 pt-2 text-[10px] uppercase tracking-[0.18em] text-black/38">
+                            Institutions
+                          </p>
+                          {institutionLinks.map((institution) => {
+                            const activeInstitution =
+                              pathname === "/programmes" && searchParams.get("institution") === institution.slug;
 
-                      <div className="mt-1 space-y-1">
-                        {mrcLinks.map((mrc) => {
-                          const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
+                            return (
+                              <Link
+                                key={institution.slug}
+                                href={institution.href}
+                                className={cn(
+                                  "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                  activeInstitution
+                                    ? "bg-black/[0.06] text-black"
+                                    : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                )}
+                              >
+                                <span className="truncate">{institution.label}</span>
+                                <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                  {institution.count}
+                                </span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : null}
 
-                          return (
-                            <Link
-                              key={mrc.slug}
-                              href={mrc.href}
-                              className={cn(
-                                "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                activeMrc
-                                  ? "bg-black/[0.06] text-black"
-                                  : "text-black/60 hover:bg-black/[0.03] hover:text-black",
-                              )}
-                            >
-                              <span className="truncate">{mrc.name}</span>
-                              <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                {mrc.count}
-                              </span>
-                            </Link>
-                          );
-                        })}
-                      </div>
+                      {mrcLinks.length > 0 ? (
+                        <div className={cn("space-y-1", institutionLinks.length > 0 ? "mt-3" : "mt-0")}>
+                          <Link
+                            href="/mrcs"
+                            className={cn(
+                              "flex items-center gap-2 rounded-xl px-3 py-2 text-xs transition",
+                              pathname === "/mrcs"
+                                ? "bg-black/[0.06] text-black"
+                                : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                            )}
+                          >
+                            <MapPinned className="h-3.5 w-3.5" />
+                            <span className="uppercase tracking-[0.16em]">MRC</span>
+                          </Link>
+
+                          <div className="space-y-1">
+                            {mrcLinks.map((mrc) => {
+                              const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
+
+                              return (
+                                <Link
+                                  key={mrc.slug}
+                                  href={mrc.href}
+                                  className={cn(
+                                    "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                    activeMrc
+                                      ? "bg-black/[0.06] text-black"
+                                      : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                  )}
+                                >
+                                  <span className="truncate">{mrc.name}</span>
+                                  <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                    {mrc.count}
+                                  </span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
