@@ -10,6 +10,25 @@ const mapWidth = 1000;
 const mapHeight = 760;
 const mapPadding = 36;
 
+function isFinitePoint(point: unknown): point is [number, number] {
+  return (
+    Array.isArray(point) &&
+    point.length >= 2 &&
+    typeof point[0] === "number" &&
+    Number.isFinite(point[0]) &&
+    typeof point[1] === "number" &&
+    Number.isFinite(point[1])
+  );
+}
+
+function normalizeRing(ring: unknown) {
+  if (!Array.isArray(ring)) {
+    return [] as [number, number][];
+  }
+
+  return ring.filter(isFinitePoint) as [number, number][];
+}
+
 function simplifyRing(ring: [number, number][]) {
   const step = Math.max(1, Math.floor(ring.length / 220));
 
@@ -28,13 +47,21 @@ function simplifyRing(ring: [number, number][]) {
 }
 
 function toRings(geometry: TerritoryGeometry) {
-  return geometry.type === "Polygon"
-    ? geometry.coordinates
-    : geometry.coordinates.flatMap((polygon) => polygon);
+  const rings =
+    geometry.type === "Polygon"
+      ? geometry.coordinates
+      : geometry.coordinates.flatMap((polygon) => polygon);
+
+  return rings.map((ring) => normalizeRing(ring)).filter((ring) => ring.length >= 3);
 }
 
 function getBounds(geometry: TerritoryGeometry) {
   const points = toRings(geometry).flat();
+
+  if (points.length === 0) {
+    return null;
+  }
+
   const longitudes = points.map((point) => point[0]);
   const latitudes = points.map((point) => point[1]);
 
@@ -47,7 +74,13 @@ function getBounds(geometry: TerritoryGeometry) {
 }
 
 function buildProjection(geometry: TerritoryGeometry) {
-  const { minLon, maxLon, minLat, maxLat } = getBounds(geometry);
+  const bounds = getBounds(geometry);
+
+  if (!bounds) {
+    return null;
+  }
+
+  const { minLon, maxLon, minLat, maxLat } = bounds;
   const drawableWidth = mapWidth - mapPadding * 2;
   const drawableHeight = mapHeight - mapPadding * 2;
   const lonSpan = Math.max(maxLon - minLon, 0.001);
@@ -63,7 +96,14 @@ function buildProjection(geometry: TerritoryGeometry) {
   };
 }
 
-function buildPathData(geometry: TerritoryGeometry, project: (point: [number, number]) => readonly [number, number]) {
+function buildPathData(
+  geometry: TerritoryGeometry,
+  project: ((point: [number, number]) => readonly [number, number]) | null,
+) {
+  if (!project) {
+    return "";
+  }
+
   const rings = toRings(geometry).map((ring) => simplifyRing(ring));
 
   return rings
@@ -86,6 +126,44 @@ function buildPathData(geometry: TerritoryGeometry, project: (point: [number, nu
     .join(" ");
 }
 
+function buildMapModel(territory: TerritoryData) {
+  try {
+    const projectionGeometry = territory.provinceGeometry ?? territory.geometry;
+
+    if (!projectionGeometry) {
+      return null;
+    }
+
+    const project = buildProjection(projectionGeometry);
+
+    if (!project) {
+      return null;
+    }
+
+    const provincePath = territory.provinceGeometry ? buildPathData(territory.provinceGeometry, project) : null;
+    const territoryPath = territory.geometry ? buildPathData(territory.geometry, project) : null;
+    const municipalityPaths = territory.municipalityGeometries
+      .map((municipality) => ({
+        name: municipality.name,
+        path: buildPathData(municipality.geometry, project),
+        point: isFinitePoint(municipality.center) ? project(municipality.center) : null,
+      }))
+      .filter(
+        (municipality): municipality is { name: string; path: string; point: readonly [number, number] } =>
+          Boolean(municipality.path) && Boolean(municipality.point),
+      );
+
+    return {
+      provincePath,
+      territoryPath,
+      municipalityPaths,
+      labels: municipalityPaths.slice(0, 18),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function TerritoryMap({ territory }: { territory: TerritoryData }) {
   const [zoom, setZoom] = useState(1);
 
@@ -98,21 +176,15 @@ export function TerritoryMap({ territory }: { territory: TerritoryData }) {
     );
   }
 
-  const projectionGeometry = territory.provinceGeometry ?? territory.geometry;
+  const model = buildMapModel(territory);
 
-  if (!projectionGeometry) {
-    return null;
+  if (!model) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-4 py-6 text-sm leading-6 text-black/58">
+        Le contour officiel du territoire est incomplet ou inutilisable pour l&apos;affichage cartographique.
+      </div>
+    );
   }
-
-  const project = buildProjection(projectionGeometry);
-  const provincePath = territory.provinceGeometry ? buildPathData(territory.provinceGeometry, project) : null;
-  const territoryPath = territory.geometry ? buildPathData(territory.geometry, project) : null;
-  const municipalityPaths = territory.municipalityGeometries.map((municipality) => ({
-    name: municipality.name,
-    path: buildPathData(municipality.geometry, project),
-    point: project(municipality.center),
-  }));
-  const labels = municipalityPaths.slice(0, 18);
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-black/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.01),rgba(0,0,0,0.04))]">
@@ -145,9 +217,9 @@ export function TerritoryMap({ territory }: { territory: TerritoryData }) {
         >
           <rect width={mapWidth} height={mapHeight} fill="white" />
 
-          {provincePath ? (
+          {model.provincePath ? (
             <path
-              d={provincePath}
+              d={model.provincePath}
               fill="rgba(0,0,0,0.035)"
               stroke="rgba(0,0,0,0.12)"
               strokeWidth="2"
@@ -155,22 +227,20 @@ export function TerritoryMap({ territory }: { territory: TerritoryData }) {
             />
           ) : null}
 
-          {municipalityPaths.map((municipality) =>
-            municipality.path ? (
-              <path
-                key={municipality.name}
-                d={municipality.path}
-                fill="rgba(223,97,68,0.06)"
-                stroke="rgba(0,0,0,0.18)"
-                strokeWidth="1.5"
-                fillRule="evenodd"
-              />
-            ) : null,
-          )}
-
-          {territoryPath ? (
+          {model.municipalityPaths.map((municipality) => (
             <path
-              d={territoryPath}
+              key={municipality.name}
+              d={municipality.path}
+              fill="rgba(223,97,68,0.06)"
+              stroke="rgba(0,0,0,0.18)"
+              strokeWidth="1.5"
+              fillRule="evenodd"
+            />
+          ))}
+
+          {model.territoryPath ? (
+            <path
+              d={model.territoryPath}
               fill="rgba(223, 97, 68, 0.22)"
               stroke="rgba(223, 97, 68, 0.92)"
               strokeWidth="5"
@@ -178,7 +248,7 @@ export function TerritoryMap({ territory }: { territory: TerritoryData }) {
             />
           ) : null}
 
-          {labels.map((label) => {
+          {model.labels.map((label) => {
             const [x, y] = label.point;
             return (
               <g key={label.name}>
