@@ -2,6 +2,7 @@ import { ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceRegistry 
 
 import { env } from "@/lib/env";
 import { parseProgramFromSource } from "@/lib/fetch/parsers";
+import { resolveWorkingOfficialUrls } from "@/lib/link-validation";
 import { prisma } from "@/lib/prisma";
 import { scoreProgramForProfile } from "@/lib/scoring";
 import { hasRunToday } from "@/lib/scheduler";
@@ -107,6 +108,11 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
         html,
         (source.fallbackPayload ?? null) as Record<string, unknown> | null,
       );
+      const resolvedUrls = await resolveWorkingOfficialUrls({
+        officialUrl: parsed.officialUrl,
+        sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
+        sourceUrl: source.url,
+      });
 
       await prisma.sourceDocument.create({
         data: {
@@ -137,8 +143,8 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
           name: parsed.name,
           organization: parsed.organization,
           summary: parsed.summary,
-          officialUrl: parsed.officialUrl,
-          sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
+          officialUrl: resolvedUrls.officialUrl,
+          sourceLandingUrl: resolvedUrls.sourceLandingUrl,
           governmentLevel: parsed.governmentLevel,
           region: parsed.region,
           status: parsed.status,
@@ -161,8 +167,8 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
           name: parsed.name,
           organization: parsed.organization,
           summary: parsed.summary,
-          officialUrl: parsed.officialUrl,
-          sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
+          officialUrl: resolvedUrls.officialUrl,
+          sourceLandingUrl: resolvedUrls.sourceLandingUrl,
           governmentLevel: parsed.governmentLevel,
           region: parsed.region,
           status: parsed.status,

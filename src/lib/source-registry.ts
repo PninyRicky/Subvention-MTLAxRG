@@ -166,7 +166,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Programme officiel de la SODEC pour appuyer le developpement de projets audiovisuels au Quebec.",
       officialUrl:
-        "https://sodec.gouv.qc.ca/wp-content/uploads/programme-aide-entreprise-soutien-developpement-audiovisuel.pdf",
+        "https://sodec.gouv.qc.ca/domaines-dintervention/cinema-et-television/aide-financiere/aide-developpement/",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "REVIEW",
@@ -250,7 +250,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
   },
   {
     name: "Telefilm Canada - Financement et programmes",
-    url: "https://telefilm.ca/fr/financement-et-programmes/",
+    url: "https://telefilm.ca/fr/programmes/",
     type: "OFFICIAL",
     governmentLevel: "Federal",
     description: "Catalogue officiel des programmes Telefilm Canada.",
@@ -259,7 +259,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       organization: "Telefilm Canada",
       summary:
         "Catalogue officiel des programmes de Telefilm pour le developpement, la production et la promotion d'oeuvres audiovisuelles.",
-      officialUrl: "https://telefilm.ca/fr/financement-et-programmes/",
+      officialUrl: "https://telefilm.ca/fr/programmes/",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -281,7 +281,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
   },
   {
     name: "FMC - Programmes de financement",
-    url: "https://cmf-fmc.ca/fr/programmes-de-financement/",
+    url: "https://cmf-fmc.ca/fr/nos-programmes/programmes-et-dates-limites/",
     type: "OFFICIAL",
     governmentLevel: "Federal",
     description: "Catalogue officiel des programmes de financement du FMC.",
@@ -290,7 +290,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       organization: "Fonds des medias du Canada",
       summary:
         "Catalogue officiel des programmes de financement du Fonds des medias du Canada pour television, medias numeriques et contenus convergents.",
-      officialUrl: "https://cmf-fmc.ca/fr/programmes-de-financement/",
+      officialUrl: "https://cmf-fmc.ca/fr/nos-programmes/programmes-et-dates-limites/",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",

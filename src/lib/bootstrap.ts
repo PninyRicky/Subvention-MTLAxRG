@@ -85,7 +85,7 @@ async function removeUnofficialRecords() {
 
 async function ensureSourcePrograms() {
   const sources = await prisma.sourceRegistry.findMany();
-  const createdPrograms: string[] = [];
+  const touchedPrograms: string[] = [];
 
   for (const source of sources) {
     const payload = source.fallbackPayload as Record<string, unknown> | null;
@@ -99,56 +99,86 @@ async function ensureSourcePrograms() {
       where: { slug },
       select: { id: true },
     });
+    const baseData = {
+      slug,
+      name: String(payload.name ?? source.name),
+      organization: String(payload.organization ?? source.name),
+      summary: String(payload.summary ?? source.description ?? ""),
+      officialUrl: payload.officialUrl ? String(payload.officialUrl) : source.url,
+      sourceLandingUrl: source.url,
+      governmentLevel: String(payload.governmentLevel ?? source.governmentLevel ?? "A confirmer"),
+      region: String(payload.region ?? "Quebec"),
+      status: ProgramStatus[String(payload.status ?? "REVIEW") as keyof typeof ProgramStatus],
+      confidence: Number(payload.confidence ?? 50),
+      maxAmount: payload.maxAmount ? String(payload.maxAmount) : null,
+      maxCoveragePct: payload.maxCoveragePct ? Number(payload.maxCoveragePct) : null,
+      details: payload.details ? String(payload.details) : null,
+      eligibilityNotes: payload.eligibilityNotes ? String(payload.eligibilityNotes) : null,
+      applicationNotes: payload.applicationNotes ? String(payload.applicationNotes) : null,
+      applicantTypes: Array.isArray(payload.applicantTypes) ? (payload.applicantTypes as string[]) : [],
+      sectors: Array.isArray(payload.sectors) ? (payload.sectors as string[]) : [],
+      projectStages: Array.isArray(payload.projectStages) ? (payload.projectStages as string[]) : [],
+      eligibleExpenses: Array.isArray(payload.eligibleExpenses) ? (payload.eligibleExpenses as string[]) : [],
+      openStatusReason: payload.openStatusReason ? String(payload.openStatusReason) : null,
+      sourceId: source.id,
+      lastVerifiedAt: new Date(),
+    };
 
     if (existing) {
-      continue;
+      await prisma.fundingProgram.update({
+        where: { id: existing.id },
+        data: baseData,
+      });
+
+      touchedPrograms.push(existing.id);
+    } else {
+      const createdProgram = await prisma.fundingProgram.create({
+        data: {
+          ...baseData,
+          intakeWindows: {
+            create: payload.intakeWindow
+              ? {
+                  rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
+                  opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
+                    ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
+                    : null,
+                  closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
+                    ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
+                    : null,
+                  lastConfirmedAt: new Date(),
+                }
+              : undefined,
+          },
+        },
+      });
+
+      touchedPrograms.push(createdProgram.id);
     }
 
-    const createdProgram = await prisma.fundingProgram.create({
-      data: {
-        slug,
-        name: String(payload.name ?? source.name),
-        organization: String(payload.organization ?? source.name),
-        summary: String(payload.summary ?? source.description ?? ""),
-        officialUrl: payload.officialUrl ? String(payload.officialUrl) : source.url,
-        sourceLandingUrl: source.url,
-        governmentLevel: String(payload.governmentLevel ?? source.governmentLevel ?? "A confirmer"),
-        region: String(payload.region ?? "Quebec"),
-        status: ProgramStatus[String(payload.status ?? "REVIEW") as keyof typeof ProgramStatus],
-        confidence: Number(payload.confidence ?? 50),
-        maxAmount: payload.maxAmount ? String(payload.maxAmount) : null,
-        maxCoveragePct: payload.maxCoveragePct ? Number(payload.maxCoveragePct) : null,
-        details: payload.details ? String(payload.details) : null,
-        eligibilityNotes: payload.eligibilityNotes ? String(payload.eligibilityNotes) : null,
-        applicationNotes: payload.applicationNotes ? String(payload.applicationNotes) : null,
-        applicantTypes: Array.isArray(payload.applicantTypes) ? (payload.applicantTypes as string[]) : [],
-        sectors: Array.isArray(payload.sectors) ? (payload.sectors as string[]) : [],
-        projectStages: Array.isArray(payload.projectStages) ? (payload.projectStages as string[]) : [],
-        eligibleExpenses: Array.isArray(payload.eligibleExpenses) ? (payload.eligibleExpenses as string[]) : [],
-        openStatusReason: payload.openStatusReason ? String(payload.openStatusReason) : null,
-        sourceId: source.id,
-        lastVerifiedAt: new Date(),
-        intakeWindows: {
-          create: payload.intakeWindow
-            ? {
-                rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
-                opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
-                  ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
-                  : null,
-                closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
-                  ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
-                  : null,
-                lastConfirmedAt: new Date(),
-              }
-            : undefined,
+    if (payload.intakeWindow) {
+      await prisma.intakeWindow.deleteMany({
+        where: {
+          programId: existing?.id ?? touchedPrograms[touchedPrograms.length - 1],
         },
-      },
-    });
+      });
 
-    createdPrograms.push(createdProgram.id);
+      await prisma.intakeWindow.create({
+        data: {
+          programId: existing?.id ?? touchedPrograms[touchedPrograms.length - 1],
+          rolling: Boolean((payload.intakeWindow as Record<string, unknown>).rolling),
+          opensAt: (payload.intakeWindow as Record<string, unknown>).opensAt
+            ? new Date(String((payload.intakeWindow as Record<string, unknown>).opensAt))
+            : null,
+          closesAt: (payload.intakeWindow as Record<string, unknown>).closesAt
+            ? new Date(String((payload.intakeWindow as Record<string, unknown>).closesAt))
+            : null,
+          lastConfirmedAt: new Date(),
+        },
+      });
+    }
   }
 
-  if (createdPrograms.length === 0) {
+  if (touchedPrograms.length === 0) {
     return;
   }
 
@@ -157,7 +187,7 @@ async function ensureSourcePrograms() {
     prisma.fundingProgram.findMany({
       where: {
         id: {
-          in: createdPrograms,
+          in: touchedPrograms,
         },
       },
       include: {
