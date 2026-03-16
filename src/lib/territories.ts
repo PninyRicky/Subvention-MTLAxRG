@@ -273,39 +273,59 @@ async function inferMrc(program: TerritoryProgramInput) {
   return matched?.name ?? null;
 }
 
-async function fetchTerritoryGeometry(kind: TerritoryKind, name: string) {
+async function fetchTerritoryGeometry(
+  kind: TerritoryKind,
+  name: string,
+  options?: {
+    code?: string;
+  },
+) {
   if (!["mrc", "region", "municipality"].includes(kind)) {
     return null;
   }
 
   const config =
     kind === "mrc"
-      ? { layer: 1, field: "MRS_NM_MRC" }
+      ? { layer: 1, field: "MRS_NM_MRC", codeField: "MRS_CO_MRC" }
       : kind === "region"
         ? { layer: 0, field: "RES_NM_REG" }
         : { layer: 2, field: "MUS_NM_MUN" };
 
   const escapedName = name.replace(/'/g, "''");
-  const where = `${config.field} like '%${escapedName}%'`;
-  const queryUrl = `${mernMapServerBase}/${config.layer}/query?where=${encodeURIComponent(where)}&outFields=*&returnGeometry=true&f=geojson`;
-  const response = await fetch(queryUrl, {
-    headers: {
-      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-    },
-    next: {
-      revalidate: 60 * 60 * 24 * 7,
-    },
-  });
+  const whereClauses = [
+    kind === "mrc" && options?.code && "codeField" in config && config.codeField
+      ? `${config.codeField}='${options.code}'`
+      : null,
+    `${config.field}='${escapedName}'`,
+    `${config.field} like '%${escapedName}%'`,
+  ].filter(Boolean) as string[];
 
-  if (!response.ok) {
-    return null;
+  for (const where of whereClauses) {
+    const queryUrl = `${mernMapServerBase}/${config.layer}/query?where=${encodeURIComponent(where)}&outFields=*&returnGeometry=true&f=geojson`;
+    const response = await fetch(queryUrl, {
+      headers: {
+        "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+      },
+      next: {
+        revalidate: 60 * 60 * 24 * 7,
+      },
+    });
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const payload = (await response.json()) as {
+      features?: ArcGisFeature[];
+    };
+    const geometry = payload.features?.[0]?.geometry ?? null;
+
+    if (geometry) {
+      return geometry;
+    }
   }
 
-  const payload = (await response.json()) as {
-    features?: ArcGisFeature[];
-  };
-
-  return payload.features?.[0]?.geometry ?? null;
+  return null;
 }
 
 function getGeometryCenter(geometry: TerritoryGeometry): GeoPoint {
@@ -487,7 +507,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       label: `MRC ${mrcName}`,
       regionName: entry?.regionName,
       municipalities,
-      geometry: await fetchTerritoryGeometry("mrc", mrcName),
+      geometry: await fetchTerritoryGeometry("mrc", mrcName, { code: entry?.code }),
       provinceGeometry,
       municipalityGeometries,
       notes: [
