@@ -2,12 +2,12 @@ import Link from "next/link";
 import { ProgramStatus } from "@prisma/client";
 import { ArrowUpRight, Clock3, Radar, ShieldAlert } from "lucide-react";
 
+import { DashboardFilters } from "@/components/dashboard-filters";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { formatDateTime } from "@/lib/dates";
 import { getDashboardData } from "@/lib/dashboard";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -16,54 +16,6 @@ type SearchParams = Promise<{
   region?: string;
   focus?: string;
 }>;
-
-function buildFilterHref(
-  params: { status?: string; region?: string; focus?: string },
-  key: "status" | "region" | "focus",
-  value: string,
-) {
-  const search = new URLSearchParams();
-  const nextParams = {
-    status: params.status,
-    region: params.region,
-    focus: params.focus,
-  };
-
-  nextParams[key] = nextParams[key] === value ? undefined : value;
-
-  Object.entries(nextParams).forEach(([entryKey, entryValue]) => {
-    if (entryValue) {
-      search.set(entryKey, entryValue);
-    }
-  });
-
-  const query = search.toString();
-  return query ? `/dashboard?${query}` : "/dashboard";
-}
-
-function FilterChip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "inline-flex h-10 items-center rounded-full border px-4 text-sm transition",
-        active
-          ? "border-black bg-black text-white"
-          : "border-black/10 bg-white text-black/72 hover:border-black hover:text-black",
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -98,52 +50,13 @@ export default async function DashboardPage({
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Card>
-          <div className="mb-5 space-y-4 border-b border-black/10 pb-5">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Filtres rapides</p>
-              <p className="mt-2 text-sm leading-6 text-black/62">
-                Affiche les programmes en vue selon l&apos;ouverture, la zone cible et la famille de besoins.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Statut</span>
-                <FilterChip href={buildFilterHref(params, "status", "OPEN")} active={filters.status === "OPEN"}>
-                  Ouverts
-                </FilterChip>
-                <FilterChip href={buildFilterHref(params, "status", "REVIEW")} active={filters.status === "REVIEW"}>
-                  À vérifier
-                </FilterChip>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Zone</span>
-                <FilterChip href={buildFilterHref(params, "region", "quebec")} active={filters.region === "quebec"}>
-                  Région de Québec
-                </FilterChip>
-                <FilterChip href={buildFilterHref(params, "region", "montreal")} active={filters.region === "montreal"}>
-                  Région de Montréal
-                </FilterChip>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-black/45">Famille</span>
-                <FilterChip
-                  href={buildFilterHref(params, "focus", "cinema-creation")}
-                  active={filters.focus === "cinema-creation"}
-                >
-                  Cinéma et création culturelle
-                </FilterChip>
-                <FilterChip
-                  href={buildFilterHref(params, "focus", "obnl-development")}
-                  active={filters.focus === "obnl-development"}
-                >
-                  OBNL et développement des organismes
-                </FilterChip>
-              </div>
-            </div>
-          </div>
+          <DashboardFilters
+            params={{
+              status: params.status,
+              region: params.region,
+              focus: params.focus,
+            }}
+          />
 
           <div className="flex items-center justify-between">
             <div>

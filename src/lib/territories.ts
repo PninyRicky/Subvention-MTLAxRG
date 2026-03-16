@@ -48,6 +48,12 @@ export type TerritoryData = {
   municipalities: string[];
   regionName?: string;
   geometry: TerritoryGeometry | null;
+  provinceGeometry: TerritoryGeometry | null;
+  municipalityGeometries: {
+    name: string;
+    geometry: TerritoryGeometry;
+    center: GeoPoint;
+  }[];
   notes: string[];
   coverageLabel: string;
 };
@@ -85,6 +91,7 @@ type MrcDirectoryEntry = {
 
 type ArcGisFeature = {
   geometry?: TerritoryGeometry;
+  properties?: Record<string, string>;
 };
 
 function normalizeTerritoryText(value: string | null | undefined) {
@@ -293,6 +300,58 @@ async function fetchTerritoryGeometry(kind: TerritoryKind, name: string) {
   return payload.features?.[0]?.geometry ?? null;
 }
 
+function getGeometryCenter(geometry: TerritoryGeometry): GeoPoint {
+  const rings = geometry.type === "Polygon" ? geometry.coordinates : geometry.coordinates.flatMap((polygon) => polygon);
+  const points = rings.flat();
+  const longitudes = points.map((point) => point[0]);
+  const latitudes = points.map((point) => point[1]);
+  return [
+    (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+    (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+  ];
+}
+
+function mergeAsMultiPolygon(features: TerritoryGeometry[]) {
+  const coordinates = features.flatMap((feature) =>
+    feature.type === "Polygon" ? [feature.coordinates] : feature.coordinates,
+  );
+
+  if (coordinates.length === 0) {
+    return null;
+  }
+
+  return {
+    type: "MultiPolygon",
+    coordinates,
+  } satisfies TerritoryGeometry;
+}
+
+const getQuebecProvinceGeometry = cache(async () => {
+  const queryUrl = `${mernMapServerBase}/0/query?where=${encodeURIComponent("1=1")}&outFields=RES_NM_REG&returnGeometry=true&f=geojson`;
+  const response = await fetch(queryUrl, {
+    headers: {
+      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+    },
+    next: {
+      revalidate: 60 * 60 * 24 * 7,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as {
+    features?: ArcGisFeature[];
+  };
+
+  return mergeAsMultiPolygon(
+    (payload.features ?? [])
+      .map((feature) => feature.geometry)
+      .filter((feature): feature is TerritoryGeometry => Boolean(feature)),
+  );
+});
+
 async function getMunicipalitiesForMrc(mrcName: string) {
   const municipalities = await getMunicipalityDirectory();
   const normalizedMrcName = normalizeTerritoryText(mrcName);
@@ -313,18 +372,94 @@ async function getMunicipalitiesForRegion(regionName: string) {
     .sort((left, right) => left.localeCompare(right, "fr"));
 }
 
+async function getMunicipalityGeometriesForTerritory(
+  kind: TerritoryKind,
+  territoryName: string,
+  municipalityNames: string[],
+) {
+  if (!["mrc", "region", "municipality"].includes(kind)) {
+    return [] as TerritoryData["municipalityGeometries"];
+  }
+
+  const municipalityDirectory = await getMunicipalityDirectory();
+  let where: string | null = null;
+
+  if (kind === "mrc") {
+    const mrcCode = municipalityDirectory.find(
+      (entry) => entry.normalizedMrcName === normalizeTerritoryText(territoryName),
+    )?.mrcCode;
+
+    where = mrcCode ? `MUS_CO_MRC='${mrcCode}'` : null;
+  } else if (kind === "region") {
+    if (municipalityNames.length > 18) {
+      return [];
+    }
+
+    const escaped = municipalityNames.map((name) => `'${name.replace(/'/g, "''")}'`).join(",");
+    where = municipalityNames.length > 0 ? `MUS_NM_MUN in (${escaped})` : null;
+  } else if (kind === "municipality") {
+    where = `MUS_NM_MUN like '%${territoryName.replace(/'/g, "''")}%'`;
+  }
+
+  if (!where) {
+    return [];
+  }
+
+  const queryUrl = `${mernMapServerBase}/2/query?where=${encodeURIComponent(where)}&outFields=MUS_NM_MUN&returnGeometry=true&f=geojson`;
+  const response = await fetch(queryUrl, {
+    headers: {
+      "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
+    },
+    next: {
+      revalidate: 60 * 60 * 24 * 7,
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = (await response.json()) as {
+    features?: ArcGisFeature[];
+  };
+
+  return (payload.features ?? [])
+    .flatMap((feature) => {
+      const geometry = feature.geometry;
+      const name = feature.properties?.MUS_NM_MUN;
+
+      if (!geometry || !name) {
+        return [];
+      }
+
+      return [
+        {
+          name,
+          geometry,
+          center: getGeometryCenter(geometry),
+        },
+      ];
+    })
+    .sort((left, right) => left.name.localeCompare(right.name, "fr"));
+}
+
 export const getTerritoryDataForProgram = cache(async (program: TerritoryProgramInput) => {
+  const provinceGeometry = await getQuebecProvinceGeometry();
   const municipality = inferMunicipality(program);
 
   if (municipality) {
+    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("municipality", municipality, [municipality]);
+
     return {
       kind: "municipality",
       name: municipality,
       label: `Ville de ${municipality}`,
       municipalities: [municipality],
-      geometry: await fetchTerritoryGeometry("municipality", municipality),
+      geometry: municipalityGeometries[0]?.geometry ?? (await fetchTerritoryGeometry("municipality", municipality)),
+      provinceGeometry,
+      municipalityGeometries,
       notes: [
-        "Le territoire a ete deduit a partir de l'organisme ou de la source officielle du programme.",
+        "Le territoire a été déduit à partir de l'organisme ou de la source officielle du programme.",
       ],
       coverageLabel: "Territoire municipal détecté",
     } satisfies TerritoryData;
@@ -335,14 +470,18 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
   if (mrcName) {
     const mrcDirectory = await getMrcDirectory();
     const entry = mrcDirectory.find((item) => item.name === mrcName);
+    const municipalities = await getMunicipalitiesForMrc(mrcName);
+    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("mrc", mrcName, municipalities);
 
     return {
       kind: "mrc",
       name: mrcName,
       label: `MRC ${mrcName}`,
       regionName: entry?.regionName,
-      municipalities: await getMunicipalitiesForMrc(mrcName),
+      municipalities,
       geometry: await fetchTerritoryGeometry("mrc", mrcName),
+      provinceGeometry,
+      municipalityGeometries,
       notes: [
         "Le contour provient du service cartographique officiel du gouvernement du Québec.",
       ],
@@ -353,14 +492,22 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
   const regionName = inferRegion(program);
 
   if (regionName) {
+    const municipalities = await getMunicipalitiesForRegion(regionName);
+    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("region", regionName, municipalities);
+
     return {
       kind: "region",
       name: regionName,
       label: `Région ${regionName}`,
-      municipalities: await getMunicipalitiesForRegion(regionName),
+      municipalities,
       geometry: await fetchTerritoryGeometry("region", regionName),
+      provinceGeometry,
+      municipalityGeometries,
       notes: [
         "Le contour provient du service cartographique officiel du gouvernement du Québec.",
+        municipalityGeometries.length === 0
+          ? "Les libellés municipaux sont limités sur les territoires très larges pour garder une carte lisible."
+          : "Les municipalités visibles sont positionnées à l'intérieur du territoire détecté.",
       ],
       coverageLabel: "Territoire régional détecté",
     } satisfies TerritoryData;
@@ -373,6 +520,8 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       label: "Canada",
       municipalities: [],
       geometry: null,
+      provinceGeometry,
+      municipalityGeometries: [],
       notes: ["Le programme semble national. Aucun contour local détaillé n'est affiché."],
       coverageLabel: "Portée nationale",
     } satisfies TerritoryData;
@@ -388,6 +537,8 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       label: "Québec",
       municipalities: [],
       geometry: null,
+      provinceGeometry,
+      municipalityGeometries: [],
       notes: ["Le programme semble couvrir tout le Québec ou une portée trop large pour une MRC précise."],
       coverageLabel: "Portée provinciale",
     } satisfies TerritoryData;
@@ -399,6 +550,8 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
     label: program.region || "Territoire non précisé",
     municipalities: [],
     geometry: null,
+    provinceGeometry,
+    municipalityGeometries: [],
     notes: ["Aucun territoire cartographique suffisamment précis n'a été détecté dans la fiche actuelle."],
     coverageLabel: "Territoire à préciser",
   } satisfies TerritoryData;
