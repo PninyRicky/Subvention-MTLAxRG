@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { MatchStatus } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 
-import { TerritoryMap } from "@/components/territory-map";
+import { SafeTerritoryMap } from "@/components/territory-map-boundary";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
@@ -262,7 +262,7 @@ export default async function ProgrammeDetailPage({
                 <p className="mt-2 text-sm leading-6 text-black/64">{territory.coverageLabel}</p>
               </div>
 
-              <TerritoryMap territory={territory} />
+              <SafeTerritoryMap territory={territory} />
 
               {territory.municipalities.length > 0 ? (
                 <div className="space-y-2">

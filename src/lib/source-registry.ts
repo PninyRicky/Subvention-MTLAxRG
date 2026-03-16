@@ -87,6 +87,8 @@ const officialInstitutionHosts = new Set([
   "www.ville.montreal.qc.ca",
   "ville.quebec.qc.ca",
   "www.ville.quebec.qc.ca",
+  "mrcmemphremagog.com",
+  "www.mrcmemphremagog.com",
 ]);
 
 const blockedThirdPartyHosts = new Set([
@@ -726,5 +728,110 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
     eligibleExpenses: ["création", "médiation", "animation culturelle", "rayonnement"],
     openStatusReason:
       "Programme officiel MRC très ciblé. Le lien est direct, mais la date et l'édition active doivent être relues sur la page au moment du scan.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC des Maskoutains - Patrimoine et culture",
+    url: "https://www.mrcmaskoutains.qc.ca/patrimoine",
+    organization: "MRC des Maskoutains",
+    region: "Montérégie",
+    description: "Page officielle patrimoine et culture de la MRC des Maskoutains.",
+    summary:
+      "Page officielle de la MRC des Maskoutains qui regroupe ses leviers en patrimoine et culture, incluant des appels et soutiens culturels territoriaux.",
+    details:
+      "La page officielle agit comme point d'entrée pour les appels de projets et programmes culturels ou patrimoniaux diffusés par la MRC.",
+    eligibilityNotes:
+      "Pertinent pour les organismes culturels, OBNL, municipalités et partenaires du territoire des Maskoutains selon le volet affiché.",
+    applicationNotes:
+      "La page doit être revisitée à chaque scan pour confirmer la présence d'un appel actif et l'échéance officielle en vigueur.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "médiation", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["médiation", "patrimoine", "animation culturelle", "rayonnement"],
+    openStatusReason:
+      "Source officielle MRC repérée. Le programme exact et la date limite doivent être confirmés sur la page courante au moment du scan.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de Rocher-Percé - Fonds et programmes",
+    url: "https://www.mrcrocherperce.qc.ca/fonds-et-programmes/",
+    organization: "MRC de Rocher-Percé",
+    region: "Gaspésie-Îles-de-la-Madeleine",
+    description: "Portail officiel des fonds et programmes de la MRC de Rocher-Percé.",
+    summary:
+      "Portail officiel de la MRC de Rocher-Percé pour repérer des fonds territoriaux, culturels et de développement régional.",
+    details:
+      "La page officielle centralise plusieurs programmes territoriaux et peut mener à des mesures pertinentes pour les organismes et projets locaux.",
+    eligibilityNotes:
+      "Pertinent pour des OBNL, organismes culturels, municipalités et partenaires établis dans Rocher-Percé.",
+    applicationNotes:
+      "Le scan doit descendre au fonds ou programme cible afin de confirmer l'ouverture réelle, les pièces requises et la date limite.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité", "Entreprise"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "communications", "rayonnement", "médiation"],
+    openStatusReason:
+      "Portail officiel de programmes MRC. Le statut reste à vérifier tant que le sous-programme exact n'est pas confirmé.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de Coaticook - Fonds et programmes",
+    url: "https://www.mrcdecoaticook.qc.ca/votre-mrc/votre-mrc-fonds-et-programmes.php",
+    organization: "MRC de Coaticook",
+    region: "Estrie",
+    description: "Portail officiel des fonds et programmes de la MRC de Coaticook.",
+    summary:
+      "Portail officiel de la MRC de Coaticook pour les fonds et programmes territoriaux, dont certains leviers utiles aux organismes et projets culturels.",
+    details:
+      "La page officielle regroupe différents programmes locaux et constitue une base de veille pour les opportunités régionales de la MRC.",
+    eligibilityNotes:
+      "Convient à des OBNL, organismes culturels, municipalités et initiatives locales implantés dans la MRC de Coaticook.",
+    applicationNotes:
+      "La qualification finale dépend du programme cible repéré dans ce portail et de ses modalités propres.",
+    applicantTypes: ["OBNL", "Organisme communautaire", "Organisme culturel", "Municipalité"],
+    sectors: ["développement local", "culture", "organismes", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["projet structurant", "médiation", "rayonnement", "communications"],
+    openStatusReason:
+      "Portail officiel Coaticook détecté. Les informations utiles sont publiques, mais le programme exact doit encore être isolé.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC du Fjord-du-Saguenay - Initiatives culturelles",
+    url: "https://mrc-fjord.qc.ca/la-mrc/aide-financiere/programme-de-soutien-aux-initiatives-culturelles/",
+    organization: "MRC du Fjord-du-Saguenay",
+    region: "Saguenay-Lac-Saint-Jean",
+    description: "Programme officiel de soutien aux initiatives culturelles de la MRC du Fjord-du-Saguenay.",
+    summary:
+      "Programme officiel de la MRC du Fjord-du-Saguenay pour soutenir des initiatives culturelles structurantes sur le territoire.",
+    details:
+      "La page programme décrit un soutien culturel territorial et sert de point d'entrée officiel pour les organismes et promoteurs de la MRC.",
+    eligibilityNotes:
+      "Pertinent pour des organismes culturels, OBNL, municipalités et partenaires locaux selon les conditions de l'édition active.",
+    applicationNotes:
+      "Le programme doit être revu à chaque scan pour confirmer si l'appel 2026 est effectivement publié et ouvert.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "médiation", "création", "rayonnement"],
+    projectStages: ["développement", "production", "diffusion"],
+    eligibleExpenses: ["création", "animation culturelle", "médiation", "rayonnement"],
+    openStatusReason:
+      "Programme officiel ciblé MRC. L'ouverture 2026 doit être confirmée sur la page avant tout classement comme programme ouvert.",
+  }),
+  buildRegionalReviewSource({
+    name: "MRC de Memphrémagog - Culture",
+    url: "https://www.mrcmemphremagog.com/culture-2",
+    organization: "MRC de Memphrémagog",
+    region: "Estrie",
+    description: "Page officielle culture de la MRC de Memphrémagog.",
+    summary:
+      "Page officielle culture de la MRC de Memphrémagog servant à repérer les soutiens et appels culturels du territoire.",
+    details:
+      "La section culture de la MRC rassemble les références utiles pour la médiation, le patrimoine et les programmes culturels territoriaux.",
+    eligibilityNotes:
+      "Peut convenir à des organismes culturels, OBNL et municipalités du territoire de Memphrémagog selon le programme ciblé.",
+    applicationNotes:
+      "Le scan doit confirmer si la page affiche une édition active ou redirige vers un appel annuel fermé ou à venir.",
+    applicantTypes: ["OBNL", "Organisme culturel", "Municipalité"],
+    sectors: ["culture", "patrimoine", "médiation", "rayonnement"],
+    projectStages: ["développement", "diffusion"],
+    eligibleExpenses: ["médiation", "patrimoine", "animation culturelle", "rayonnement"],
+    openStatusReason:
+      "Section officielle culture MRC. La présence d'un appel actif doit être confirmée par lecture directe de la page officielle.",
   }),
 ];

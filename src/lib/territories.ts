@@ -23,6 +23,14 @@ const mrcAliases = {
   "mrc des collines": "Les Collines-de-l'Outaouais",
   "collines de l outaouais": "Les Collines-de-l'Outaouais",
   "mrc collines de l outaouais": "Les Collines-de-l'Outaouais",
+  "mrc des maskoutains": "Les Maskoutains",
+  "maskoutains": "Les Maskoutains",
+  "mrc de rocher perce": "Rocher-Percé",
+  "rocher perce": "Rocher-Percé",
+  "mrc de coaticook": "Coaticook",
+  "mrc du fjord du saguenay": "Le Fjord-du-Saguenay",
+  "fjord du saguenay": "Le Fjord-du-Saguenay",
+  "mrc de memphremagog": "Memphrémagog",
 };
 
 type GeoPoint = [number, number];
