@@ -1,6 +1,7 @@
 import { MatchStatus, ProgramStatus, Prisma, ReviewStatus, ScanStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { MIN_VISIBLE_PROGRAM_SCORE, buildVisibleProgramWhere } from "@/lib/program-visibility";
 
 export type DashboardFilters = {
   status?: ProgramStatus;
@@ -9,7 +10,7 @@ export type DashboardFilters = {
 };
 
 function getDashboardProgramWhere(filters: DashboardFilters): Prisma.FundingProgramWhereInput {
-  const conditions: Prisma.FundingProgramWhereInput[] = [];
+  const conditions: Prisma.FundingProgramWhereInput[] = [buildVisibleProgramWhere()];
 
   if (filters.status) {
     conditions.push({ status: filters.status });
@@ -74,6 +75,11 @@ export async function getDashboardData(filters: DashboardFilters = {}) {
       include: {
         intakeWindows: true,
         matchResults: {
+          where: {
+            score: {
+              gte: 55,
+            },
+          },
           include: {
             profile: true,
           },
@@ -98,6 +104,7 @@ export async function getDashboardData(filters: DashboardFilters = {}) {
     prisma.reviewQueue.count({
       where: {
         status: ReviewStatus.PENDING,
+        program: buildVisibleProgramWhere(),
       },
     }),
     prisma.fetchRun.findFirst({
@@ -112,17 +119,22 @@ export async function getDashboardData(filters: DashboardFilters = {}) {
     }),
     prisma.fundingProgram.count({
       where: {
+        ...buildVisibleProgramWhere(),
         status: ProgramStatus.OPEN,
       },
     }),
     prisma.fundingProgram.count({
       where: {
+        ...buildVisibleProgramWhere(),
         status: ProgramStatus.REVIEW,
       },
     }),
     prisma.matchResult.count({
       where: {
         status: MatchStatus.ELIGIBLE,
+        score: {
+          gte: MIN_VISIBLE_PROGRAM_SCORE,
+        },
       },
     }),
   ]);

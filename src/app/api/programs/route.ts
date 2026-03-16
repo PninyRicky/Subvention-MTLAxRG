@@ -2,6 +2,7 @@ import { Prisma, ProgramStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { buildVisibleProgramWhere } from "@/lib/program-visibility";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
 
   const programs = await prisma.fundingProgram.findMany({
     where: {
+      ...buildVisibleProgramWhere(),
       ...(status && Object.values(ProgramStatus).includes(status as ProgramStatus)
         ? { status: status as ProgramStatus }
         : {}),

@@ -8,6 +8,7 @@ import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { buildInstitutionProgramWhere, getInstitutionConfig, getInstitutionNavLinks } from "@/lib/institutions";
 import { prisma } from "@/lib/prisma";
+import { MIN_VISIBLE_PROGRAM_SCORE, buildVisibleProgramWhere } from "@/lib/program-visibility";
 
 type SearchParams = Promise<{
   status?: string;
@@ -39,6 +40,7 @@ export default async function ProgrammesPage({
 
   const programs = await prisma.fundingProgram.findMany({
     where: {
+      ...buildVisibleProgramWhere(),
       ...(institutionWhere ?? {}),
       ...(status ? { status } : {}),
       ...(matchEligible ? { matchResults: { some: { status: MatchStatus.ELIGIBLE } } } : {}),
@@ -90,6 +92,11 @@ export default async function ProgrammesPage({
         },
       },
       matchResults: {
+        where: {
+          score: {
+            gte: MIN_VISIBLE_PROGRAM_SCORE,
+          },
+        },
         orderBy: {
           score: "desc",
         },
@@ -140,60 +147,66 @@ export default async function ProgrammesPage({
             ) : null}
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-[1.45fr_0.8fr_0.8fr_0.8fr_1fr_auto]">
-            <input
-              type="search"
-              name="q"
-              defaultValue={params.q}
-              placeholder="Rechercher un programme, un organisme..."
-              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
-            />
-            <select
-              name="status"
-              defaultValue={params.status ?? ""}
-              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Tous les statuts</option>
-              <option value="OPEN">Ouverts</option>
-              <option value="REVIEW">À vérifier</option>
-              <option value="CLOSED">Fermes</option>
-            </select>
-            <select
-              name="level"
-              defaultValue={params.level ?? ""}
-              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Tous les niveaux</option>
-              <option value="Quebec">Québec</option>
-              <option value="Federal">Fédéral</option>
-              <option value="Municipal">Municipal</option>
-              <option value="Regional">Régional</option>
-              <option value="Canada">Canada</option>
-            </select>
-            <select
-              name="favorites"
-              defaultValue={params.favorites ?? ""}
-              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Tous</option>
-              <option value="1">Favoris seulement</option>
-            </select>
-            <select
-              name="institution"
-              defaultValue={params.institution ?? ""}
-              className="h-11 rounded-2xl border border-black/10 px-4 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Toutes les institutions</option>
-              {institutionLinks.map((link) => (
-                <option key={link.slug} value={link.slug}>
-                  {link.label}
-                </option>
-              ))}
-            </select>
-            <button className="h-11 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-[color:var(--accent)]">
-              Filtrer
-            </button>
-          </form>
+          <div className="rounded-[28px] border border-black/10 bg-black/[0.02] p-4 lg:min-w-[760px]">
+            <form className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_repeat(4,minmax(0,1fr))_auto] lg:items-end">
+              <input
+                type="search"
+                name="q"
+                defaultValue={params.q}
+                placeholder="Rechercher un programme, un organisme..."
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none transition focus:border-black"
+              />
+              <select
+                name="status"
+                defaultValue={params.status ?? ""}
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none transition focus:border-black"
+              >
+                <option value="">Tous les statuts</option>
+                <option value="OPEN">Ouverts</option>
+                <option value="REVIEW">À vérifier</option>
+                <option value="CLOSED">Fermés</option>
+              </select>
+              <select
+                name="level"
+                defaultValue={params.level ?? ""}
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none transition focus:border-black"
+              >
+                <option value="">Tous les niveaux</option>
+                <option value="Quebec">Québec</option>
+                <option value="Federal">Fédéral</option>
+                <option value="Municipal">Municipal</option>
+                <option value="Regional">Régional</option>
+                <option value="Canada">Canada</option>
+              </select>
+              <select
+                name="favorites"
+                defaultValue={params.favorites ?? ""}
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none transition focus:border-black"
+              >
+                <option value="">Tous</option>
+                <option value="1">Favoris seulement</option>
+              </select>
+              <select
+                name="institution"
+                defaultValue={params.institution ?? ""}
+                className="h-11 rounded-2xl border border-black/10 bg-white px-4 text-sm outline-none transition focus:border-black"
+              >
+                <option value="">Toutes les institutions</option>
+                {institutionLinks.map((link) => (
+                  <option key={link.slug} value={link.slug}>
+                    {link.label}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 text-sm text-black/58">
+                <span>Score min.</span>
+                <span className="font-medium text-black">{MIN_VISIBLE_PROGRAM_SCORE}</span>
+              </div>
+              <button className="h-11 rounded-full bg-black px-5 text-sm font-medium text-white transition hover:bg-[color:var(--accent)]">
+                Filtrer
+              </button>
+            </form>
+          </div>
         </div>
       </Card>
 

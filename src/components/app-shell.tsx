@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, FolderSearch2, MapPinned, Radar, ScanSearch } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BarChart3, ChevronDown, FolderSearch2, MapPinned, Radar, ScanSearch } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,28 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const groupedMrcLinks = useMemo(
+    () =>
+      Object.entries(
+        mrcLinks.reduce<Record<string, typeof mrcLinks>>((groups, mrc) => {
+          const bucket = groups[mrc.regionName] ?? [];
+          bucket.push(mrc);
+          groups[mrc.regionName] = bucket;
+          return groups;
+        }, {}),
+      ).sort(([left], [right]) => left.localeCompare(right, "fr")),
+    [mrcLinks],
+  );
+  const activeInstitutionSlug = pathname === "/programmes" ? searchParams.get("institution") : null;
+  const activeMrcSlug = pathname === "/mrcs" ? searchParams.get("mrc") : null;
+  const activeMrcRegion = activeMrcSlug
+    ? groupedMrcLinks.find(([, entries]) => entries.some((entry) => entry.slug === activeMrcSlug))?.[0] ?? null
+    : null;
+  const [institutionsOpen, setInstitutionsOpen] = useState(Boolean(activeInstitutionSlug));
+  const [mrcOpen, setMrcOpen] = useState(Boolean(pathname === "/mrcs" || activeMrcSlug));
+  const [openRegions, setOpenRegions] = useState<Record<string, boolean>>(
+    activeMrcRegion ? { [activeMrcRegion]: true } : {},
+  );
 
   async function handleLogout() {
     await fetch("/api/session/logout", {
@@ -93,88 +116,133 @@ export function AppShell({
                     <div className="ml-6 mt-2 border-l border-black/10 pl-3">
                       {institutionLinks.length > 0 ? (
                         <div className="space-y-1">
-                          <p className="px-3 pt-2 text-[10px] uppercase tracking-[0.18em] text-black/38">
-                            Institutions
-                          </p>
-                          {institutionLinks.map((institution) => {
-                            const activeInstitution =
-                              pathname === "/programmes" && searchParams.get("institution") === institution.slug;
+                          <button
+                            type="button"
+                            onClick={() => setInstitutionsOpen((current) => !current)}
+                            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-black/60 transition hover:bg-black/[0.03] hover:text-black"
+                          >
+                            <span className="uppercase tracking-[0.18em] text-black/38">Institutions</span>
+                            <ChevronDown
+                              className={cn(
+                                "h-3.5 w-3.5 transition",
+                                institutionsOpen ? "rotate-180 text-black/60" : "text-black/35",
+                              )}
+                            />
+                          </button>
 
-                            return (
-                              <Link
-                                key={institution.slug}
-                                href={institution.href}
-                                className={cn(
-                                  "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                  activeInstitution
-                                    ? "bg-black/[0.06] text-black"
-                                    : "text-black/60 hover:bg-black/[0.03] hover:text-black",
-                                )}
-                              >
-                                <span className="truncate">{institution.label}</span>
-                                <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                  {institution.count}
-                                </span>
-                              </Link>
-                            );
-                          })}
+                          {institutionsOpen ? (
+                            <div className="space-y-1">
+                              {institutionLinks.map((institution) => {
+                                const activeInstitution = pathname === "/programmes" && activeInstitutionSlug === institution.slug;
+
+                                return (
+                                  <Link
+                                    key={institution.slug}
+                                    href={institution.href}
+                                    className={cn(
+                                      "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                      activeInstitution
+                                        ? "bg-black/[0.06] text-black"
+                                        : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                    )}
+                                  >
+                                    <span className="truncate">{institution.label}</span>
+                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                      {institution.count}
+                                    </span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
 
                       {mrcLinks.length > 0 ? (
                         <div className={cn("space-y-1", institutionLinks.length > 0 ? "mt-3" : "mt-0")}>
-                          <Link
-                            href="/mrcs"
-                            className={cn(
-                              "flex items-center gap-2 rounded-xl px-3 py-2 text-xs transition",
-                              pathname === "/mrcs"
-                                ? "bg-black/[0.06] text-black"
-                                : "text-black/60 hover:bg-black/[0.03] hover:text-black",
-                            )}
+                          <button
+                            type="button"
+                            onClick={() => setMrcOpen((current) => !current)}
+                            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition hover:bg-black/[0.03]"
                           >
-                            <MapPinned className="h-3.5 w-3.5" />
-                            <span className="uppercase tracking-[0.16em]">MRC</span>
-                          </Link>
+                            <span className="flex items-center gap-2 text-black/60">
+                              <MapPinned className="h-3.5 w-3.5" />
+                              <span className="uppercase tracking-[0.16em]">MRC</span>
+                            </span>
+                            <ChevronDown
+                              className={cn("h-3.5 w-3.5 transition", mrcOpen ? "rotate-180 text-black/60" : "text-black/35")}
+                            />
+                          </button>
 
-                          <div className="space-y-2">
-                            {Object.entries(
-                              mrcLinks.reduce<Record<string, typeof mrcLinks>>((groups, mrc) => {
-                                const bucket = groups[mrc.regionName] ?? [];
-                                bucket.push(mrc);
-                                groups[mrc.regionName] = bucket;
-                                return groups;
-                              }, {}),
-                            )
-                              .sort(([left], [right]) => left.localeCompare(right, "fr"))
-                              .map(([regionName, entries]) => (
-                                <div key={regionName} className="space-y-1">
-                                  <p className="px-3 pt-1 text-[10px] uppercase tracking-[0.18em] text-black/38">
-                                    {regionName}
-                                  </p>
-                                  {entries.map((mrc) => {
-                                    const activeMrc = pathname === "/mrcs" && searchParams.get("mrc") === mrc.slug;
+                          {mrcOpen ? (
+                            <div className="space-y-2">
+                              <Link
+                                href="/mrcs"
+                                className={cn(
+                                  "flex items-center gap-2 rounded-xl px-3 py-2 text-xs transition",
+                                  pathname === "/mrcs" && !activeMrcSlug
+                                    ? "bg-black/[0.06] text-black"
+                                    : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                )}
+                              >
+                                <MapPinned className="h-3.5 w-3.5" />
+                                <span>Toutes les MRC</span>
+                              </Link>
 
-                                    return (
-                                      <Link
-                                        key={mrc.slug}
-                                        href={mrc.href}
+                              {groupedMrcLinks.map(([regionName, entries]) => {
+                                const regionOpen = openRegions[regionName] ?? regionName === activeMrcRegion;
+
+                                return (
+                                  <div key={regionName} className="space-y-1">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setOpenRegions((current) => ({
+                                          ...current,
+                                          [regionName]: !regionOpen,
+                                        }))
+                                      }
+                                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-black/60 transition hover:bg-black/[0.03] hover:text-black"
+                                    >
+                                      <span className="truncate uppercase tracking-[0.18em] text-black/38">{regionName}</span>
+                                      <ChevronDown
                                         className={cn(
-                                          "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                          activeMrc
-                                            ? "bg-black/[0.06] text-black"
-                                            : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                          "h-3.5 w-3.5 transition",
+                                          regionOpen ? "rotate-180 text-black/60" : "text-black/35",
                                         )}
-                                      >
-                                        <span className="truncate">{mrc.name}</span>
-                                        <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                          {mrc.count}
-                                        </span>
-                                      </Link>
-                                    );
-                                  })}
-                                </div>
-                              ))}
-                          </div>
+                                      />
+                                    </button>
+
+                                    {regionOpen ? (
+                                      <div className="space-y-1">
+                                        {entries.map((mrc) => {
+                                          const activeMrc = pathname === "/mrcs" && activeMrcSlug === mrc.slug;
+
+                                          return (
+                                            <Link
+                                              key={mrc.slug}
+                                              href={mrc.href}
+                                              className={cn(
+                                                "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
+                                                activeMrc
+                                                  ? "bg-black/[0.06] text-black"
+                                                  : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                              )}
+                                            >
+                                              <span className="truncate">{mrc.name}</span>
+                                              <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
+                                                {mrc.count}
+                                              </span>
+                                            </Link>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

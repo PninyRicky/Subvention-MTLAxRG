@@ -2,6 +2,7 @@ import { cache } from "react";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { buildVisibleProgramWhere } from "@/lib/program-visibility";
 
 export type InstitutionNavLink = {
   slug: string;
@@ -79,7 +80,10 @@ export const getInstitutionNavLinks = cache(async (): Promise<InstitutionNavLink
     institutionConfigs.map(async (config) => ({
       config,
       count: await prisma.fundingProgram.count({
-        where: buildInstitutionWhere(config),
+        where: {
+          ...buildVisibleProgramWhere(),
+          ...buildInstitutionWhere(config),
+        },
       }),
     })),
   );

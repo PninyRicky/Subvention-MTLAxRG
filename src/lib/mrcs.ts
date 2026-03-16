@@ -2,6 +2,7 @@ import { cache } from "react";
 import { ProgramStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { buildVisibleProgramWhere } from "@/lib/program-visibility";
 import { getMrcDirectory, normalizeOfficialPlaceName, territorySlug } from "@/lib/territories";
 
 export type MrcProgramSummary = {
@@ -78,6 +79,7 @@ export const getMrcGroups = cache(async (): Promise<MrcGroup[]> => {
     prisma.fundingProgram.findMany({
       where: {
         governmentLevel: "Regional",
+        ...buildVisibleProgramWhere(),
       },
       select: {
         id: true,
