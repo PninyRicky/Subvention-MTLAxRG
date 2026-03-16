@@ -52,7 +52,7 @@ function FilterChip({
       className={cn(
         "inline-flex h-10 items-center rounded-full border px-4 text-sm transition",
         active
-          ? "border-black bg-black text-white"
+          ? "border-black bg-black text-white [&_*]:text-inherit"
           : "border-black/10 bg-white text-black/72 hover:border-black hover:text-black",
       )}
     >

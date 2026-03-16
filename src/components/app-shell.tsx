@@ -80,7 +80,9 @@ export function AppShell({
                     href={item.href}
                     className={cn(
                       "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
-                      active ? "bg-black text-white" : "text-black/72 hover:bg-black/[0.04] hover:text-black",
+                      active
+                        ? "bg-black text-white [&_*]:text-inherit"
+                        : "text-black/72 hover:bg-black/[0.04] hover:text-black",
                     )}
                   >
                     <Icon className="h-4 w-4" />
