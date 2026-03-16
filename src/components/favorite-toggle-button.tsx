@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 
@@ -18,8 +18,15 @@ export function FavoriteToggleButton({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [favorite, setFavorite] = useState(isFavorite);
+
+  useEffect(() => {
+    setFavorite(isFavorite);
+  }, [isFavorite]);
 
   async function handleToggle() {
+    const nextFavorite = !favorite;
+    setFavorite(nextFavorite);
     setPending(true);
 
     try {
@@ -29,7 +36,7 @@ export function FavoriteToggleButton({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          isFavorite: !isFavorite,
+          isFavorite: nextFavorite,
         }),
       });
 
@@ -40,6 +47,8 @@ export function FavoriteToggleButton({
       startTransition(() => {
         router.refresh();
       });
+    } catch {
+      setFavorite(!nextFavorite);
     } finally {
       setPending(false);
     }
@@ -48,13 +57,18 @@ export function FavoriteToggleButton({
   return (
     <Button
       variant={compact ? "ghost" : "secondary"}
-      className={cn(compact ? "h-9 px-3" : "", isFavorite ? "border-[color:var(--accent)]/20 bg-[color:var(--accent-soft)] text-[color:var(--accent)]" : "")}
+      className={cn(
+        compact ? "h-9 px-3" : "",
+        favorite ? "border-[color:var(--accent)]/20 bg-[color:var(--accent-soft)] text-[color:var(--accent)]" : "",
+        pending ? "opacity-90" : "",
+      )}
       onClick={handleToggle}
       disabled={pending}
-      aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+      aria-label={favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+      aria-pressed={favorite}
     >
-      <Heart className={cn("h-4 w-4", isFavorite ? "fill-current" : "")} />
-      {!compact ? <span className="ml-2">{isFavorite ? "Favori" : "Ajouter aux favoris"}</span> : null}
+      <Heart className={cn("h-4 w-4 transition-colors", favorite ? "fill-current" : "")} />
+      {!compact ? <span className="ml-2">{favorite ? "Favori" : "Ajouter aux favoris"}</span> : null}
     </Button>
   );
 }
