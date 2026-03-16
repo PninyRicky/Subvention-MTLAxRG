@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const aiProgramAnalysisSchema = z.object({
+  programName: z.string().nullable(),
+  officialUrl: z.string().url().nullable().or(z.literal(null)),
   status: z.enum(["OPEN", "CLOSED", "REVIEW"]).nullable(),
   statusReason: z.string().nullable(),
   closesAt: z.string().nullable(),

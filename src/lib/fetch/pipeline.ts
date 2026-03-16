@@ -18,10 +18,12 @@ type PipelineOptions = {
 };
 
 type ParsedProgram = ReturnType<typeof parseProgramFromSource>;
+type CachedAiProgramAnalysis = AiProgramAnalysis & { analysisVersion?: number };
 
 const SOURCE_FETCH_TIMEOUT_MS = 8_000;
 const SOURCE_FETCH_MAX_ATTEMPTS = 2;
 const REVIEW_REASON = "Informations incomplètes ou ambiguës après collecte.";
+const AI_ANALYSIS_CACHE_VERSION = 2;
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -203,7 +205,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       const rawContent = html ?? JSON.stringify(source.fallbackPayload ?? {});
       const contentHash = hashContent(rawContent);
 
-      let aiAnalysis: AiProgramAnalysis | null = null;
+      let aiAnalysis: CachedAiProgramAnalysis | null = null;
       if (isAiEnabled()) {
         const existingDoc = await prisma.sourceDocument.findFirst({
           where: { sourceId: source.id, contentHash },
@@ -216,18 +218,24 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
               select: { aiAnalysis: true },
             })
           : null;
+        const cachedAnalysis = existingAi?.aiAnalysis as CachedAiProgramAnalysis | null;
+        const canReuseCachedAnalysis =
+          mode !== ScanMode.MANUAL &&
+          cachedAnalysis &&
+          (cachedAnalysis.analysisVersion ?? 1) >= AI_ANALYSIS_CACHE_VERSION;
 
-        if (existingAi?.aiAnalysis) {
-          aiAnalysis = existingAi.aiAnalysis as unknown as AiProgramAnalysis;
+        if (canReuseCachedAnalysis) {
+          aiAnalysis = cachedAnalysis;
         } else {
           const bodyText = html
             ? html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
             : JSON.stringify(source.fallbackPayload ?? {});
-          aiAnalysis = await analyzeProgramPage(bodyText, {
+          const freshAnalysis = await analyzeProgramPage(bodyText, {
             sourceName: source.name,
             sourceUrl: source.url,
             governmentLevel: source.governmentLevel ?? "A confirmer",
           });
+          aiAnalysis = freshAnalysis ? { ...freshAnalysis, analysisVersion: AI_ANALYSIS_CACHE_VERSION } : null;
         }
       }
 

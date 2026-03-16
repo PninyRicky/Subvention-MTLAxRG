@@ -361,7 +361,9 @@ export function parseProgramFromSource(
     ),
     ai?.eligibleExpenses,
   );
-  const directOfficialUrl = pickDirectOfficialUrl(source, $, pageTitle, parsedFallback);
+  const directOfficialUrl = ai?.officialUrl && isOfficialInstitutionUrl(ai.officialUrl)
+    ? ai.officialUrl
+    : pickDirectOfficialUrl(source, $, ai?.programName ?? pageTitle, parsedFallback);
   const details = ai?.details ?? parsedFallback.details ?? extractBodyExcerpt(bodyText, 560) ?? metaDescription;
   const eligibilityNotes =
     ai?.eligibilityNotes ??
@@ -398,8 +400,8 @@ export function parseProgramFromSource(
   );
 
   return {
-    slug: slugify(pageTitle),
-    name: pageTitle,
+    slug: slugify(ai?.programName ?? pageTitle),
+    name: ai?.programName ?? pageTitle,
     organization: ai?.organization ?? String(parsedFallback.organization ?? source.name),
     summary: ai?.summary ?? metaDescription,
     officialUrl: isOfficialInstitutionUrl(directOfficialUrl) ? directOfficialUrl : source.url,

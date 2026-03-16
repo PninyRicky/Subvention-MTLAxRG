@@ -5,6 +5,8 @@ import { aiProgramAnalysisSchema } from "@/lib/ai/schema";
 describe("aiProgramAnalysisSchema", () => {
   it("accepte une reponse AI complete", () => {
     const result = aiProgramAnalysisSchema.safeParse({
+      programName: "SODEC - Soutien au développement audiovisuel",
+      officialUrl: "https://sodec.gouv.qc.ca/domaines-dintervention/cinema-et-television/aide-financiere/aide-developpement/",
       status: "OPEN",
       statusReason: "Le programme accepte les demandes.",
       closesAt: "2026-06-15",
@@ -29,6 +31,8 @@ describe("aiProgramAnalysisSchema", () => {
 
   it("accepte une reponse AI avec tous les champs null", () => {
     const result = aiProgramAnalysisSchema.safeParse({
+      programName: null,
+      officialUrl: null,
       status: null,
       statusReason: null,
       closesAt: null,
@@ -53,6 +57,8 @@ describe("aiProgramAnalysisSchema", () => {
 
   it("rejette un statut invalide", () => {
     const result = aiProgramAnalysisSchema.safeParse({
+      programName: null,
+      officialUrl: null,
       status: "INVALID",
       statusReason: null,
       closesAt: null,
@@ -77,6 +83,8 @@ describe("aiProgramAnalysisSchema", () => {
 
   it("rejette une confidence hors bornes", () => {
     const result = aiProgramAnalysisSchema.safeParse({
+      programName: null,
+      officialUrl: null,
       status: "OPEN",
       statusReason: null,
       closesAt: null,
