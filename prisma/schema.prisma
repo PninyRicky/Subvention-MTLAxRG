@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  ADMIN
+  ANALYST
+}
+
+enum SourceType {
+  OFFICIAL
+  AGGREGATOR
+}
+
+enum ProgramStatus {
+  OPEN
+  REVIEW
+  CLOSED
+}
+
+enum ScanMode {
+  SCHEDULED
+  MANUAL
+}
+
+enum ScanStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum MatchStatus {
+  ELIGIBLE
+  REVIEW
+  INELIGIBLE
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          AppRole   @default(ANALYST)
+  accounts      Account[]
+  sessions      Session[]
+  fetchRuns     FetchRun[] @relation("FetchRunInitiator")
+  reviews       ReviewQueue[] @relation("ReviewByUser")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model SourceRegistry {
+  id              String           @id @default(cuid())
+  name            String
+  url             String           @unique
+  type            SourceType
+  cadence         String           @default("mwf-06:00-toronto")
+  description     String?
+  active          Boolean          @default(true)
+  governmentLevel String?
+  fallbackPayload Json?
+  documents       SourceDocument[]
+  programs        FundingProgram[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model FundingProgram {
+  id               String            @id @default(cuid())
+  slug             String            @unique
+  name             String
+  organization     String
+  summary          String            @db.Text
+  officialUrl      String
+  governmentLevel  String
+  region           String
+  status           ProgramStatus     @default(REVIEW)
+  confidence       Int               @default(50)
+  maxAmount        String?
+  maxCoveragePct   Int?
+  applicantTypes   String[]
+  sectors          String[]
+  projectStages    String[]
+  eligibleExpenses String[]
+  openStatusReason String?
+  sourceId         String?
+  source           SourceRegistry?   @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  intakeWindows    IntakeWindow[]
+  eligibilityRules EligibilityRule[]
+  matchResults     MatchResult[]
+  reviews          ReviewQueue[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  lastVerifiedAt   DateTime?
+}
+
+model IntakeWindow {
+  id              String         @id @default(cuid())
+  programId       String
+  label           String?
+  opensAt         DateTime?
+  closesAt        DateTime?
+  rolling         Boolean        @default(false)
+  timezone        String         @default("America/Toronto")
+  lastConfirmedAt DateTime?
+  program         FundingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+}
+
+model EligibilityRule {
+  id         String         @id @default(cuid())
+  programId  String
+  key        String
+  operator   String
+  value      String
+  confidence Int            @default(50)
+  program    FundingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+}
+
+model ServiceProfile {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  scenario    String
+  description String        @db.Text
+  criteria    Json
+  weights     Json
+  thresholds  Json
+  active      Boolean       @default(true)
+  matches     MatchResult[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model MatchResult {
+  id            String         @id @default(cuid())
+  programId     String
+  profileId     String
+  status        MatchStatus
+  score         Int
+  reasons       Json
+  exclusions    Json
+  uncertainties Json
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  profile       ServiceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  program       FundingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, profileId])
+}
+
+model FetchRun {
+  id              String           @id @default(cuid())
+  mode            ScanMode
+  status          ScanStatus       @default(QUEUED)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  sourceCount     Int              @default(0)
+  discoveredCount Int              @default(0)
+  updatedCount    Int              @default(0)
+  closedCount     Int              @default(0)
+  reviewCount     Int              @default(0)
+  initiatedById   String?
+  notes           String?
+  error           String?
+  initiatedBy     User?            @relation("FetchRunInitiator", fields: [initiatedById], references: [id], onDelete: SetNull)
+  documents       SourceDocument[]
+  reviews         ReviewQueue[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model SourceDocument {
+  id          String         @id @default(cuid())
+  sourceId     String
+  fetchRunId   String?
+  url          String
+  title        String?
+  rawContent   String        @db.Text
+  contentHash  String
+  fetchedAt    DateTime      @default(now())
+  source       SourceRegistry @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  fetchRun     FetchRun?     @relation(fields: [fetchRunId], references: [id], onDelete: SetNull)
+}
+
+model ReviewQueue {
+  id           String         @id @default(cuid())
+  programId     String
+  fetchRunId    String?
+  reason        String
+  fields        Json
+  status        ReviewStatus  @default(PENDING)
+  notes         String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  fetchRun      FetchRun?     @relation(fields: [fetchRunId], references: [id], onDelete: SetNull)
+  program       FundingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  reviewedBy    User?         @relation("ReviewByUser", fields: [reviewedById], references: [id], onDelete: SetNull)
+}

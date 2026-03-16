@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/mtla-subventions
 
 # next.js
 /.next/
@@ -22,6 +25,7 @@
 
 # misc
 .DS_Store
+._*
 *.pem
 
 # debug
