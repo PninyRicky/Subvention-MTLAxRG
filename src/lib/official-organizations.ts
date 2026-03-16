@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 import { parseCsvRecords } from "@/lib/csv";
 import {
@@ -70,6 +71,7 @@ async function fetchOfficialText(url: string) {
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
+    signal: AbortSignal.timeout(6000),
     next: {
       revalidate: 60 * 60 * 24,
     },
@@ -82,7 +84,7 @@ async function fetchOfficialText(url: string) {
   return response.text();
 }
 
-const getArtistCentres = cache(async () => {
+const getArtistCentres = unstable_cache(async () => {
   const municipalities = await getMunicipalityDirectory();
   const records = parseCsvRecords(await fetchOfficialText(artistCentresUrl));
 
@@ -107,9 +109,11 @@ const getArtistCentres = cache(async () => {
       };
     })
     .filter((record) => Boolean(record.name));
+}, ["official-organizations-artist-centres"], {
+  revalidate: 60 * 60 * 24,
 });
 
-const getRegionalCouncils = cache(async () => {
+const getRegionalCouncils = unstable_cache(async () => {
   const records = parseCsvRecords(await fetchOfficialText(regionalCouncilsUrl));
 
   return records
@@ -124,9 +128,11 @@ const getRegionalCouncils = cache(async () => {
       sourceUrl: regionalCouncilsUrl,
     }))
     .filter((record) => Boolean(record.name));
+}, ["official-organizations-regional-councils"], {
+  revalidate: 60 * 60 * 24,
 });
 
-const getCommunityMedia = cache(async () => {
+const getCommunityMedia = unstable_cache(async () => {
   const municipalities = await getMunicipalityDirectory();
   const records = parseCsvRecords(await fetchOfficialText(communityMediaUrl));
 
@@ -148,9 +154,11 @@ const getCommunityMedia = cache(async () => {
       };
     })
     .filter((record) => Boolean(record.name));
+}, ["official-organizations-community-media"], {
+  revalidate: 60 * 60 * 24,
 });
 
-const getSaguenayOrganizations = cache(async () => {
+const getSaguenayOrganizations = unstable_cache(async () => {
   const records = parseCsvRecords(await fetchOfficialText(saguenayDirectoryUrl));
 
   return records
@@ -164,13 +172,16 @@ const getSaguenayOrganizations = cache(async () => {
       sourceUrl: saguenayDirectoryUrl,
     }))
     .filter((record) => Boolean(record.name));
+}, ["official-organizations-saguenay-directory"], {
+  revalidate: 60 * 60 * 24,
 });
 
-async function extractOrganizationsFromSourcePage(sourceUrl: string) {
+const extractOrganizationsFromSourcePage = unstable_cache(async (sourceUrl: string) => {
   const response = await fetch(sourceUrl, {
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
+    signal: AbortSignal.timeout(3500),
     next: {
       revalidate: 60 * 60 * 24,
     },
@@ -218,7 +229,9 @@ async function extractOrganizationsFromSourcePage(sourceUrl: string) {
     .filter((item): item is OfficialOrganization => Boolean(item));
 
   return uniqueOrganizations(links);
-}
+}, ["official-organizations-source-page"], {
+  revalidate: 60 * 60 * 24,
+});
 
 function matchesTerritory(
   territory: TerritoryData,

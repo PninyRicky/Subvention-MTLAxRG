@@ -9,8 +9,6 @@ import { formatDate, formatDateTime } from "@/lib/dates";
 import { buildInstitutionProgramWhere, getInstitutionConfig, getInstitutionNavLinks } from "@/lib/institutions";
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
-
 type SearchParams = Promise<{
   status?: string;
   q?: string;
@@ -66,19 +64,39 @@ export default async function ProgrammesPage({
           }
         : {}),
     },
-    include: {
-      intakeWindows: true,
-      matchResults: {
-        include: {
-          profile: true,
+    select: {
+      id: true,
+      name: true,
+      organization: true,
+      summary: true,
+      status: true,
+      governmentLevel: true,
+      updatedAt: true,
+      officialUrl: true,
+      isFavorite: true,
+      intakeWindows: {
+        orderBy: {
+          closesAt: "asc",
         },
+        take: 1,
+        select: {
+          closesAt: true,
+        },
+      },
+      matchResults: {
         orderBy: {
           score: "desc",
         },
-      },
-      reviews: {
-        orderBy: {
-          createdAt: "desc",
+        take: 1,
+        select: {
+          id: true,
+          score: true,
+          status: true,
+          profile: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },

@@ -1,17 +1,15 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { MatchStatus } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 
-import { SafeTerritoryMap } from "@/components/territory-map-boundary";
+import { ProgramOrganizationsCard } from "@/components/program-organizations-card";
+import { ProgramTerritoryCard } from "@/components/program-territory-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
-import { getOfficialOrganizationsForTerritory } from "@/lib/official-organizations";
 import { prisma } from "@/lib/prisma";
-import { getTerritoryDataForProgram } from "@/lib/territories";
-
-export const dynamic = "force-dynamic";
 
 export default async function ProgrammeDetailPage({
   params,
@@ -40,7 +38,7 @@ export default async function ProgrammeDetailPage({
     notFound();
   }
 
-  const territory = await getTerritoryDataForProgram({
+  const programInput = {
     name: program.name,
     organization: program.organization,
     region: program.region,
@@ -49,12 +47,7 @@ export default async function ProgrammeDetailPage({
     details: program.details,
     sourceName: program.source?.name,
     sourceUrl: program.source?.url,
-  });
-
-  const organizationDirectory = await getOfficialOrganizationsForTerritory(territory, {
-    sourceName: program.source?.name,
-    sourceUrl: program.source?.url,
-  });
+  };
 
   const tone =
     program.status === "OPEN" ? "open" : program.status === "REVIEW" ? "review" : "closed";
@@ -254,136 +247,38 @@ export default async function ProgrammeDetailPage({
             </div>
           </Card>
 
-          <Card>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Territoire admissible</p>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-[24px] border border-black/10 p-4">
-                <p className="text-sm font-medium text-black">{territory.label}</p>
-                <p className="mt-2 text-sm leading-6 text-black/64">{territory.coverageLabel}</p>
-                {territory.regionName ? (
-                  <p className="mt-2 text-sm leading-6 text-black/64">
-                    <span className="font-medium text-black">Région administrative:</span> {territory.regionName}
-                  </p>
-                ) : null}
-                {territory.territoryCode ? (
-                  <p className="text-sm leading-6 text-black/64">
-                    <span className="font-medium text-black">Code officiel:</span> {territory.territoryCode}
-                  </p>
-                ) : null}
-              </div>
+          <Suspense fallback={<ProgramSideCardSkeleton title="Territoire admissible" lines={5} />}>
+            <ProgramTerritoryCard programInput={programInput} />
+          </Suspense>
 
-              <SafeTerritoryMap territory={territory} />
-
-              {territory.municipalities.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-black/55">Municipalités couvertes</p>
-                  <div className="flex flex-wrap gap-2">
-                    {territory.municipalities.map((municipality) => (
-                      <span
-                        key={municipality}
-                        className="rounded-full border border-black/10 bg-black/[0.02] px-3 py-1.5 text-xs text-black/70"
-                      >
-                        {municipality}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <ul className="space-y-2 text-sm leading-6 text-black/62">
-                {territory.notes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            </div>
-          </Card>
-
-          <Card>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Organismes repérés sur ce territoire</p>
-            <p className="mt-4 text-sm leading-6 text-black/64">{organizationDirectory.coverageNote}</p>
-
-            <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
-              {organizationDirectory.organizations.length > 0 ? (
-                organizationDirectory.organizations.map((organization) => (
-                  <div key={organization.id} className="rounded-[24px] border border-black/10 p-4">
-                    <p className="text-sm font-medium text-black">{organization.name}</p>
-                    <div className="mt-2 space-y-1 text-sm leading-6 text-black/64">
-                      {organization.municipality ? (
-                        <p>
-                          <span className="font-medium text-black">Municipalité:</span> {organization.municipality}
-                        </p>
-                      ) : null}
-                      {organization.region ? (
-                        <p>
-                          <span className="font-medium text-black">Région:</span> {organization.region}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="font-medium text-black">Source:</span> {organization.sourceLabel}
-                      </p>
-                      <div className="flex flex-wrap gap-3 pt-1">
-                        <a
-                          href={organization.website ?? organization.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm text-[color:var(--accent)] underline-offset-4 hover:underline"
-                        >
-                          {organization.website ? "Ouvrir l’organisme" : "Ouvrir la source"}
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                        {organization.website && organization.sourceUrl !== organization.website ? (
-                          <a
-                            href={organization.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-sm text-black/72 underline-offset-4 hover:underline"
-                          >
-                            Source officielle
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        ) : null}
-                      </div>
-                      {organization.email ? (
-                        <p>
-                          <span className="font-medium text-black">Courriel:</span> {organization.email}
-                        </p>
-                      ) : null}
-                      {organization.phone ? (
-                        <p>
-                          <span className="font-medium text-black">Téléphone:</span> {organization.phone}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-[24px] border border-dashed border-black/12 bg-black/[0.02] px-4 py-6 text-sm leading-6 text-black/58">
-                  Aucun organisme public n&apos;a encore été relié à ce territoire avec les jeux de données officiels
-                  actuellement intégrés.
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 space-y-2 border-t border-black/10 pt-4 text-xs leading-5 text-black/54">
-              <p className="uppercase tracking-[0.18em]">Sources de répertoire</p>
-              <ul className="space-y-2">
-                {organizationDirectory.dataSources.map((item) => (
-                  <li key={item.url}>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-black/70 underline-offset-4 hover:text-black hover:underline"
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Card>
+          <Suspense fallback={<ProgramSideCardSkeleton title="Organismes repérés sur ce territoire" lines={8} />}>
+            <ProgramOrganizationsCard
+              programInput={programInput}
+              sourceName={program.source?.name}
+              sourceUrl={program.source?.url}
+            />
+          </Suspense>
         </div>
       </div>
     </div>
+  );
+}
+
+function ProgramSideCardSkeleton({
+  title,
+  lines,
+}: {
+  title: string;
+  lines: number;
+}) {
+  return (
+    <Card>
+      <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">{title}</p>
+      <div className="mt-4 space-y-3">
+        {Array.from({ length: lines }).map((_, index) => (
+          <div key={`${title}-${index}`} className="h-4 animate-pulse rounded-full bg-black/[0.06]" />
+        ))}
+      </div>
+    </Card>
   );
 }

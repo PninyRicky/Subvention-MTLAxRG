@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 import { parseCsvRecords } from "@/lib/csv";
 import { slugify } from "@/lib/utils";
@@ -145,6 +146,7 @@ async function fetchOfficialText(url: string) {
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
+    signal: AbortSignal.timeout(6000),
     next: {
       revalidate: 60 * 60 * 24,
     },
@@ -157,7 +159,7 @@ async function fetchOfficialText(url: string) {
   return response.text();
 }
 
-export const getMunicipalityDirectory = cache(async (): Promise<MunicipalityDirectoryEntry[]> => {
+export const getMunicipalityDirectory = unstable_cache(async (): Promise<MunicipalityDirectoryEntry[]> => {
   const raw = await fetchOfficialText(municipalityDirectoryUrl);
   const records = parseCsvRecords(raw);
 
@@ -182,9 +184,11 @@ export const getMunicipalityDirectory = cache(async (): Promise<MunicipalityDire
       } satisfies MunicipalityDirectoryEntry,
     ];
   });
+}, ["territories-municipality-directory"], {
+  revalidate: 60 * 60 * 24,
 });
 
-export const getMrcDirectory = cache(async (): Promise<MrcDirectoryEntry[]> => {
+export const getMrcDirectory = unstable_cache(async (): Promise<MrcDirectoryEntry[]> => {
   const raw = await fetchOfficialText(mrcDirectoryUrl);
   const records = parseCsvRecords(raw);
 
@@ -208,9 +212,11 @@ export const getMrcDirectory = cache(async (): Promise<MrcDirectoryEntry[]> => {
       } satisfies MrcDirectoryEntry,
     ];
   });
+}, ["territories-mrc-directory"], {
+  revalidate: 60 * 60 * 24,
 });
 
-export const getRegionDirectory = cache(async (): Promise<RegionDirectoryEntry[]> => {
+export const getRegionDirectory = unstable_cache(async (): Promise<RegionDirectoryEntry[]> => {
   const mrcDirectory = await getMrcDirectory();
   const regions = new Map<string, RegionDirectoryEntry>();
 
@@ -231,6 +237,8 @@ export const getRegionDirectory = cache(async (): Promise<RegionDirectoryEntry[]
   }
 
   return [...regions.values()].sort((left, right) => left.name.localeCompare(right.name, "fr"));
+}, ["territories-region-directory"], {
+  revalidate: 60 * 60 * 24,
 });
 
 function buildHaystack(program: TerritoryProgramInput) {
@@ -346,6 +354,7 @@ async function fetchTerritoryGeometry(
       headers: {
         "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
       },
+      signal: AbortSignal.timeout(4000),
       next: {
         revalidate: 60 * 60 * 24 * 7,
       },
@@ -394,12 +403,13 @@ function mergeAsMultiPolygon(features: TerritoryGeometry[]) {
   } satisfies TerritoryGeometry;
 }
 
-const getQuebecProvinceGeometry = cache(async () => {
+const getQuebecProvinceGeometry = unstable_cache(async () => {
   const queryUrl = `${mernMapServerBase}/0/query?where=${encodeURIComponent("1=1")}&outFields=RES_NM_REG&returnGeometry=true&f=geojson`;
   const response = await fetch(queryUrl, {
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
+    signal: AbortSignal.timeout(4000),
     next: {
       revalidate: 60 * 60 * 24 * 7,
     },
@@ -418,6 +428,8 @@ const getQuebecProvinceGeometry = cache(async () => {
       .map((feature) => feature.geometry)
       .filter((feature): feature is TerritoryGeometry => Boolean(feature)),
   );
+}, ["territories-quebec-province-geometry"], {
+  revalidate: 60 * 60 * 24 * 7,
 });
 
 async function getMunicipalitiesForMrc(mrcName: string) {
@@ -478,6 +490,7 @@ async function getMunicipalityGeometriesForTerritory(
     headers: {
       "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
     },
+    signal: AbortSignal.timeout(4000),
     next: {
       revalidate: 60 * 60 * 24 * 7,
     },
@@ -512,11 +525,14 @@ async function getMunicipalityGeometriesForTerritory(
 }
 
 export const getTerritoryDataForProgram = cache(async (program: TerritoryProgramInput) => {
-  const provinceGeometry = await getQuebecProvinceGeometry();
+  const provinceGeometryPromise = getQuebecProvinceGeometry();
   const municipality = inferMunicipality(program);
 
   if (municipality) {
-    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("municipality", municipality, [municipality]);
+    const [provinceGeometry, municipalityGeometries] = await Promise.all([
+      provinceGeometryPromise,
+      getMunicipalityGeometriesForTerritory("municipality", municipality, [municipality]),
+    ]);
 
     return {
       kind: "municipality",
@@ -536,8 +552,11 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
   const mrcEntry = await inferMrc(program);
 
   if (mrcEntry) {
-    const municipalities = await getMunicipalitiesForMrc(mrcEntry.name);
-    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("mrc", mrcEntry.name, municipalities);
+    const [provinceGeometry, municipalities] = await Promise.all([provinceGeometryPromise, getMunicipalitiesForMrc(mrcEntry.name)]);
+    const [municipalityGeometries, geometry] = await Promise.all([
+      getMunicipalityGeometriesForTerritory("mrc", mrcEntry.name, municipalities),
+      fetchTerritoryGeometry("mrc", mrcEntry.name, { code: mrcEntry.code }),
+    ]);
 
     return {
       kind: "mrc",
@@ -546,7 +565,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       regionName: mrcEntry.regionName,
       territoryCode: mrcEntry.code,
       municipalities,
-      geometry: await fetchTerritoryGeometry("mrc", mrcEntry.name, { code: mrcEntry.code }),
+      geometry,
       provinceGeometry,
       municipalityGeometries,
       notes: [
@@ -560,8 +579,14 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
   const regionName = await inferRegion(program);
 
   if (regionName) {
-    const municipalities = await getMunicipalitiesForRegion(regionName);
-    const municipalityGeometries = await getMunicipalityGeometriesForTerritory("region", regionName, municipalities);
+    const [provinceGeometry, municipalities] = await Promise.all([
+      provinceGeometryPromise,
+      getMunicipalitiesForRegion(regionName),
+    ]);
+    const [municipalityGeometries, geometry] = await Promise.all([
+      getMunicipalityGeometriesForTerritory("region", regionName, municipalities),
+      fetchTerritoryGeometry("region", regionName),
+    ]);
 
     return {
       kind: "region",
@@ -569,7 +594,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
       label: `Région ${regionName}`,
       territoryCode: undefined,
       municipalities,
-      geometry: await fetchTerritoryGeometry("region", regionName),
+      geometry,
       provinceGeometry,
       municipalityGeometries,
       notes: [
@@ -583,6 +608,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
   }
 
   if (normalizeTerritoryText(program.region) === "canada") {
+    const provinceGeometry = await provinceGeometryPromise;
     return {
       kind: "country",
       name: "Canada",
@@ -600,6 +626,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
     normalizeTerritoryText(program.region) === "quebec" ||
     normalizeTerritoryText(program.governmentLevel) === "quebec"
   ) {
+    const provinceGeometry = await provinceGeometryPromise;
     return {
       kind: "province",
       name: "Québec",
@@ -613,6 +640,7 @@ export const getTerritoryDataForProgram = cache(async (program: TerritoryProgram
     } satisfies TerritoryData;
   }
 
+  const provinceGeometry = await provinceGeometryPromise;
   return {
     kind: "unknown",
     name: program.region,
