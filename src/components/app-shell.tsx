@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { BarChart3, ChevronDown, FolderSearch2, MapPinned, Radar, ScanSearch } from "lucide-react";
 
+import { SegmentScanButton } from "@/components/segment-scan-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -37,12 +38,39 @@ export function AppShell({
   action,
   institutionLinks = [],
   mrcLinks = [],
+  mrcRegionLinks = [],
 }: {
   children: React.ReactNode;
   userLabel: string;
   action?: React.ReactNode;
-  institutionLinks?: { slug: string; label: string; count: number; href: string }[];
-  mrcLinks?: { slug: string; name: string; count: number; href: string; regionName: string }[];
+  institutionLinks?: {
+    slug: string;
+    label: string;
+    count: number;
+    href: string;
+    sourceIds: string[];
+    targetLabel: string;
+    lastScannedAt: string | null;
+  }[];
+  mrcLinks?: {
+    slug: string;
+    name: string;
+    count: number;
+    href: string;
+    regionName: string;
+    sourceIds: string[];
+    targetLabel: string;
+    targetSourceId?: string | null;
+    lastScannedAt: string | null;
+  }[];
+  mrcRegionLinks?: {
+    slug: string;
+    name: string;
+    count: number;
+    sourceIds: string[];
+    targetLabel: string;
+    lastScannedAt: string | null;
+  }[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -136,21 +164,33 @@ export function AppShell({
                                 const activeInstitution = pathname === "/programmes" && activeInstitutionSlug === institution.slug;
 
                                 return (
-                                  <Link
+                                  <div
                                     key={institution.slug}
-                                    href={institution.href}
                                     className={cn(
-                                      "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                      activeInstitution
-                                        ? "bg-black/[0.06] text-black"
-                                        : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                      "flex items-center gap-2 rounded-xl px-2 py-1",
+                                      activeInstitution ? "bg-black/[0.06]" : "",
                                     )}
                                   >
-                                    <span className="truncate">{institution.label}</span>
-                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                      {institution.count}
-                                    </span>
-                                  </Link>
+                                    <Link
+                                      href={institution.href}
+                                      className={cn(
+                                        "flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-1 py-1 text-xs transition",
+                                        activeInstitution
+                                          ? "text-black"
+                                          : "text-black/60 hover:text-black",
+                                      )}
+                                    >
+                                      <span className="truncate">{institution.label}</span>
+                                      <span className="shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
+                                        {institution.count}
+                                      </span>
+                                    </Link>
+                                    <SegmentScanButton
+                                      label={institution.targetLabel}
+                                      sourceIds={institution.sourceIds}
+                                      lastScannedAt={institution.lastScannedAt}
+                                    />
+                                  </div>
                                 );
                               })}
                             </div>
@@ -191,27 +231,41 @@ export function AppShell({
 
                               {groupedMrcLinks.map(([regionName, entries]) => {
                                 const regionOpen = openRegions[regionName] ?? regionName === activeMrcRegion;
+                                const regionMeta =
+                                  mrcRegionLinks.find((region) => region.name === regionName) ?? null;
 
                                 return (
                                   <div key={regionName} className="space-y-1">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setOpenRegions((current) => ({
-                                          ...current,
-                                          [regionName]: !regionOpen,
-                                        }))
-                                      }
-                                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-black/60 transition hover:bg-black/[0.03] hover:text-black"
-                                    >
-                                      <span className="truncate uppercase tracking-[0.18em] text-black/38">{regionName}</span>
+                                    <div className="flex items-center gap-2 rounded-xl px-3 py-2 transition hover:bg-black/[0.03]">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setOpenRegions((current) => ({
+                                            ...current,
+                                            [regionName]: !regionOpen,
+                                          }))
+                                        }
+                                        className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left text-xs text-black/60 transition hover:text-black"
+                                      >
+                                        <span className="truncate uppercase tracking-[0.18em] text-black/38">{regionName}</span>
+                                        <span className="ml-auto shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
+                                          {regionMeta?.count ?? entries.reduce((sum, entry) => sum + entry.count, 0)}
+                                        </span>
+                                      </button>
+                                      {regionMeta ? (
+                                        <SegmentScanButton
+                                          label={regionMeta.targetLabel}
+                                          sourceIds={regionMeta.sourceIds}
+                                          lastScannedAt={regionMeta.lastScannedAt}
+                                        />
+                                      ) : null}
                                       <ChevronDown
                                         className={cn(
-                                          "h-3.5 w-3.5 transition",
+                                          "h-3.5 w-3.5 shrink-0 transition",
                                           regionOpen ? "rotate-180 text-black/60" : "text-black/35",
                                         )}
                                       />
-                                    </button>
+                                    </div>
 
                                     {regionOpen ? (
                                       <div className="space-y-1">
@@ -219,21 +273,34 @@ export function AppShell({
                                           const activeMrc = pathname === "/mrcs" && activeMrcSlug === mrc.slug;
 
                                           return (
-                                            <Link
+                                            <div
                                               key={mrc.slug}
-                                              href={mrc.href}
                                               className={cn(
-                                                "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs transition",
-                                                activeMrc
-                                                  ? "bg-black/[0.06] text-black"
-                                                  : "text-black/60 hover:bg-black/[0.03] hover:text-black",
+                                                "flex items-center gap-2 rounded-xl px-2 py-1",
+                                                activeMrc ? "bg-black/[0.06]" : "",
                                               )}
                                             >
-                                              <span className="truncate">{mrc.name}</span>
-                                              <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-black/40">
-                                                {mrc.count}
-                                              </span>
-                                            </Link>
+                                              <Link
+                                                href={mrc.href}
+                                                className={cn(
+                                                  "flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-1 py-1 text-xs transition",
+                                                  activeMrc
+                                                    ? "text-black"
+                                                    : "text-black/60 hover:text-black",
+                                                )}
+                                              >
+                                                <span className="truncate">{mrc.name}</span>
+                                                <span className="shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
+                                                  {mrc.count}
+                                                </span>
+                                              </Link>
+                                              <SegmentScanButton
+                                                label={mrc.targetLabel}
+                                                sourceIds={mrc.sourceIds}
+                                                targetSourceId={mrc.targetSourceId}
+                                                lastScannedAt={mrc.lastScannedAt}
+                                              />
+                                            </div>
                                           );
                                         })}
                                       </div>

@@ -1,14 +1,19 @@
 import { cache } from "react";
 import { Prisma } from "@prisma/client";
 
+import { getLatestCompletedScanMap } from "@/lib/fetch-run-metadata";
 import { prisma } from "@/lib/prisma";
 import { buildVisibleProgramWhere } from "@/lib/program-visibility";
+import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 
 export type InstitutionNavLink = {
   slug: string;
   label: string;
   count: number;
   href: string;
+  sourceIds: string[];
+  targetLabel: string;
+  lastScannedAt: string | null;
 };
 
 type InstitutionConfig = {
@@ -76,7 +81,20 @@ function buildInstitutionWhere(config: InstitutionConfig): Prisma.FundingProgram
 }
 
 export const getInstitutionNavLinks = cache(async (): Promise<InstitutionNavLink[]> => {
-  const counts = await Promise.all(
+  const [sources, counts] = await Promise.all([
+    prisma.sourceRegistry.findMany({
+      where: {
+        active: true,
+        type: "OFFICIAL",
+      },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        description: true,
+      },
+    }),
+    Promise.all(
     institutionConfigs.map(async (config) => ({
       config,
       count: await prisma.fundingProgram.count({
@@ -85,17 +103,52 @@ export const getInstitutionNavLinks = cache(async (): Promise<InstitutionNavLink
           ...buildInstitutionWhere(config),
         },
       }),
+      sourceIds: (
+        await prisma.fundingProgram.findMany({
+          where: {
+            ...buildVisibleProgramWhere(),
+            ...buildInstitutionWhere(config),
+          },
+          select: {
+            sourceId: true,
+          },
+        })
+      )
+        .map((program) => program.sourceId)
+        .filter((value): value is string => Boolean(value)),
     })),
-  );
+    ),
+  ]);
+
+  const labels = counts.map(({ config }) => `Institution: ${config.label}`);
+  const latestByLabel = await getLatestCompletedScanMap(labels);
 
   return counts
     .filter((entry) => entry.count > 0)
-    .map(({ config, count }) => ({
-      slug: config.slug,
-      label: config.label,
-      count,
-      href: `/programmes?institution=${config.slug}`,
-    }));
+    .map(({ config, count, sourceIds }) => {
+      const matchedSourceIds = sources
+        .filter((source) => {
+          if (!isOfficialInstitutionUrl(source.url)) {
+            return false;
+          }
+
+          const haystack = [source.name, source.url, source.description ?? ""].join(" ").toLowerCase();
+          return config.patterns.some((pattern) => haystack.includes(pattern.toLowerCase()));
+        })
+        .map((source) => source.id);
+      const uniqueSourceIds = [...new Set([...sourceIds, ...matchedSourceIds])];
+      const targetLabel = `Institution: ${config.label}`;
+
+      return {
+        slug: config.slug,
+        label: config.label,
+        count,
+        href: `/programmes?institution=${config.slug}`,
+        sourceIds: uniqueSourceIds,
+        targetLabel,
+        lastScannedAt: latestByLabel.get(targetLabel) ?? null,
+      };
+    });
 });
 
 export function buildInstitutionProgramWhere(slug: string): Prisma.FundingProgramWhereInput | null {

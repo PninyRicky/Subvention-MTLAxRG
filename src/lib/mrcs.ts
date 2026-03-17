@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { ProgramStatus } from "@prisma/client";
 
+import { getLatestCompletedScanMap } from "@/lib/fetch-run-metadata";
 import { prisma } from "@/lib/prisma";
 import { buildVisibleProgramWhere } from "@/lib/program-visibility";
 import { getMrcDirectory, normalizeOfficialPlaceName, territorySlug } from "@/lib/territories";
@@ -32,7 +33,32 @@ export type MrcNavLink = {
   count: number;
   href: string;
   regionName: string;
+  sourceIds: string[];
+  targetLabel: string;
+  targetSourceId?: string | null;
+  lastScannedAt: string | null;
 };
+
+export type MrcRegionNavLink = {
+  slug: string;
+  name: string;
+  count: number;
+  sourceIds: string[];
+  targetLabel: string;
+  lastScannedAt: string | null;
+};
+
+function normalizeHostname(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
 
 function simplifyMrcText(value: string) {
   return normalizeOfficialPlaceName(value)
@@ -161,13 +187,81 @@ export const getMrcGroups = cache(async (): Promise<MrcGroup[]> => {
 });
 
 export const getMrcNavLinks = cache(async (): Promise<MrcNavLink[]> => {
-  const groups = await getMrcGroups();
+  const [groups, sources] = await Promise.all([
+    getMrcGroups(),
+    prisma.sourceRegistry.findMany({
+      where: {
+        active: true,
+        type: "OFFICIAL",
+        governmentLevel: "Regional",
+      },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+      },
+    }),
+  ]);
+  const targetLabels = groups.map((group) => `MRC: ${group.name}`);
+  const latestByLabel = await getLatestCompletedScanMap(targetLabels);
 
-  return groups.map((group) => ({
-    slug: group.slug,
-    name: group.name,
-    count: group.programCount,
-    href: `/mrcs?mrc=${group.slug}`,
-    regionName: group.regionName,
-  }));
+  return groups.map((group) => {
+    const targetLabel = `MRC: ${group.name}`;
+    const websiteHost = normalizeHostname(group.website);
+    const uniqueSourceIds = [
+      ...new Set(
+        sources
+          .filter((source) => {
+            const sourceHost = normalizeHostname(source.url);
+            const normalizedSourceName = normalizeOfficialPlaceName(source.name);
+            return (
+              (websiteHost && sourceHost === websiteHost) ||
+              normalizedSourceName.includes(group.slug.replace(/-/g, " ")) ||
+              normalizeOfficialPlaceName(group.name).includes(normalizedSourceName)
+            );
+          })
+          .map((source) => source.id),
+      ),
+    ];
+
+    return {
+      slug: group.slug,
+      name: group.name,
+      count: group.programCount,
+      href: `/mrcs?mrc=${group.slug}`,
+      regionName: group.regionName,
+      sourceIds: uniqueSourceIds,
+      targetLabel,
+      targetSourceId: uniqueSourceIds.length === 1 ? uniqueSourceIds[0] : null,
+      lastScannedAt: latestByLabel.get(targetLabel) ?? null,
+    };
+  });
+});
+
+export const getMrcRegionLinks = cache(async (): Promise<MrcRegionNavLink[]> => {
+  const mrcLinks = await getMrcNavLinks();
+  const groupedByRegion = mrcLinks.reduce<Record<string, MrcNavLink[]>>((accumulator, link) => {
+    const bucket = accumulator[link.regionName] ?? [];
+    bucket.push(link);
+    accumulator[link.regionName] = bucket;
+    return accumulator;
+  }, {});
+
+  const labels = Object.keys(groupedByRegion).map((regionName) => `Région MRC: ${regionName}`);
+  const latestByLabel = await getLatestCompletedScanMap(labels);
+
+  return Object.entries(groupedByRegion)
+    .map(([regionName, links]) => {
+      const targetLabel = `Région MRC: ${regionName}`;
+
+      return {
+        slug: territorySlug(regionName),
+        name: regionName,
+        count: links.reduce((sum, link) => sum + link.count, 0),
+        sourceIds: [...new Set(links.flatMap((link) => link.sourceIds))],
+        targetLabel,
+        lastScannedAt: latestByLabel.get(targetLabel) ?? null,
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name, "fr"));
 });

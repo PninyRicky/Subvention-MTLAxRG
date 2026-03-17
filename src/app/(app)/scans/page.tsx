@@ -80,9 +80,17 @@ export default async function ScansPage() {
                         <Badge tone={tone}>{run.status}</Badge>
                       </td>
                       <td className="px-6 py-5 text-sm leading-6 text-black/64">
-                        <p>{run.scope === ScanScope.PROGRAM ? "Programme" : "Veille globale"}</p>
+                        <p>
+                          {run.scope === ScanScope.PROGRAM
+                            ? "Programme"
+                            : run.targetLabel
+                              ? "Segment"
+                              : "Veille globale"}
+                        </p>
                         {run.scope === ScanScope.PROGRAM && run.targetProgram ? (
                           <p className="max-w-[240px] text-black/48">{run.targetProgram.name}</p>
+                        ) : run.targetLabel ? (
+                          <p className="max-w-[240px] text-black/48">{run.targetLabel}</p>
                         ) : null}
                       </td>
                       <td className="px-6 py-5 text-sm text-black/64">{run.mode}</td>

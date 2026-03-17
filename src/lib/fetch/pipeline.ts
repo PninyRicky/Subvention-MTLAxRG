@@ -30,6 +30,9 @@ type PipelineOptions = {
   scope?: ScanScope;
   initiatedById?: string | null;
   targetProgramId?: string | null;
+  sourceIds?: string[];
+  targetSourceId?: string | null;
+  targetLabel?: string | null;
 };
 
 type CachedAiProgramAnalysis = AiProgramAnalysis & {
@@ -804,6 +807,9 @@ export async function executeFetchRun({
   initiatedById,
   scope = ScanScope.GLOBAL,
   targetProgramId,
+  sourceIds,
+  targetSourceId,
+  targetLabel,
 }: PipelineOptions) {
   await expireStaleFetchRuns();
 
@@ -873,8 +879,8 @@ export async function executeFetchRun({
       startedAt: new Date(),
       initiatedById: initiatedById ?? null,
       targetProgramId: targetProgram?.id ?? null,
-      targetSourceId: targetProgram?.sourceId ?? null,
-      targetLabel: targetProgram?.name ?? null,
+      targetSourceId: targetProgram?.sourceId ?? targetSourceId ?? null,
+      targetLabel: targetProgram?.name ?? targetLabel ?? null,
     },
   });
 
@@ -913,14 +919,24 @@ export async function executeFetchRun({
         where: {
           active: true,
           type: "OFFICIAL",
+          ...(sourceIds?.length
+            ? {
+                id: {
+                  in: sourceIds,
+                },
+              }
+            : {}),
         },
       });
 
       const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
-      const sourcesToProcess =
-        mode === ScanMode.MANUAL
-          ? officialSources.filter((source) => !isGeneratedRegionalPortalSource(source))
-          : officialSources;
+      const sourcesToProcess = sourceIds?.length
+        ? officialSources
+        : officialSources.filter((source) => !isGeneratedRegionalPortalSource(source));
+
+      if (sourceIds?.length && !sourcesToProcess.length) {
+        throw new Error("Aucune source officielle active n’est disponible pour ce segment.");
+      }
 
       sourceJobs.push(
         ...sourcesToProcess.map((source) => ({
@@ -972,9 +988,11 @@ export async function executeFetchRun({
         notes:
           scope === ScanScope.PROGRAM
             ? `Scan approfondi ciblé sur le programme avec crawl BFS limité, PDF, volets et URL officielles directes.`
+            : targetLabel
+              ? `Scan ciblé de segment sur ${targetLabel}.`
             : mode === ScanMode.MANUAL
               ? `Scan de veille global sur les sources officielles prioritaires, sans deep crawl massif des portails territoriaux générés.`
-              : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
+              : `Scan planifié sur les sources officielles prioritaires, sans portails territoriaux générés.`,
       },
     });
   } catch (error) {
