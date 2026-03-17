@@ -487,7 +487,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
   },
   {
     name: "Patrimoine canadien - Initiatives stratégiques du Fonds du Canada pour l’investissement en culture",
-    url: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture/initiatives-strategiques.html",
+    url: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture.html",
     type: "OFFICIAL",
     governmentLevel: "Federal",
     description: "Programme officiel fédéral pour améliorer les pratiques d’affaires, les revenus et les capacités d’organismes artistiques et patrimoniaux.",
@@ -497,18 +497,18 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Volet fédéral destiné aux projets partenariaux qui renforcent les opérations, les pratiques d’affaires, les revenus et l’usage stratégique des technologies dans les organismes artistiques et patrimoniaux.",
       officialUrl:
-        "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture/initiatives-strategiques.html",
+        "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture.html",
       seedType: "program",
       governmentLevel: "Federal",
       region: "Canada",
-      status: "REVIEW",
-      confidence: 82,
+      status: "CLOSED",
+      confidence: 90,
       details:
-        "Ce volet est particulièrement pertinent pour des organismes qui veulent structurer leur développement, moderniser leurs pratiques ou mutualiser des ressources, incluant un angle numérique ou de rayonnement organisationnel.",
+        "Ce volet était particulièrement pertinent pour des organismes qui voulaient structurer leur développement, moderniser leurs pratiques ou mutualiser des ressources. La fiche détaillée historique n’est plus accessible et le programme doit être traité comme retiré ou fermé jusqu’à preuve officielle contraire.",
       eligibilityNotes:
-        "Le demandeur doit être un organisme à but non lucratif ou équivalent lié aux arts ou au patrimoine, souvent avec un projet partenarial. Ce n’est pas un programme de promotion simple, mais il peut financer des projets de transformation et de développement organisationnel reliés au service Essence de marque.",
+        "Le programme visait des organismes artistiques ou patrimoniaux dans une logique de transformation et de développement organisationnel. En l’état, la fiche active du volet n’est plus accessible.",
       applicationNotes:
-        "Toujours relire les lignes directrices et confirmer la date de dépôt active. Le scan doit privilégier la fiche détaillée du volet plutôt que le portail général de Patrimoine canadien.",
+        "La fiche détaillée directe renvoie désormais vers une page introuvable. Conserver le portail du Fonds du Canada pour l’investissement en culture comme point de référence institutionnel, mais traiter ce volet précis comme fermé ou retiré tant qu’une nouvelle fiche officielle n’existe pas.",
       applicantTypes: ["OBNL", "Organisme culturel", "Organisme patrimonial"],
       sectors: ["developpement organisationnel", "communications", "rayonnement", "developpement numerique"],
       projectStages: ["developpement"],
@@ -517,7 +517,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       maxAmount: "Selon le projet",
       maxCoveragePct: null,
       openStatusReason:
-        "Le programme officiel existe et vise explicitement l’amélioration des pratiques d’affaires et l’usage stratégique des technologies; les dates doivent être confirmées sur la page courante.",
+        "La fiche officielle directe du volet n’existe plus et renvoie une erreur 404 sur Canada.ca. Le programme est traité comme fermé ou retiré tant qu’une page officielle active n’est pas rétablie.",
     },
   },
   {

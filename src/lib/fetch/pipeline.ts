@@ -66,6 +66,15 @@ const STALE_FETCH_RUN_TIMEOUT_MS = 20 * 60 * 1000;
 const REVIEW_REASON = "Informations incomplètes ou ambiguës après collecte.";
 const AI_ANALYSIS_CACHE_VERSION = 3;
 
+function isProgramSeed(source: SourceRegistry) {
+  const payload =
+    source.fallbackPayload && typeof source.fallbackPayload === "object"
+      ? (source.fallbackPayload as Record<string, unknown>)
+      : null;
+
+  return payload?.seedType === "program";
+}
+
 function createEmptyMetrics(): ProcessingMetrics {
   return {
     discoveredCount: 0,
@@ -346,16 +355,42 @@ async function upsertProgramFromParsedPayload({
     sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
     sourceUrl: source.url,
   });
+  const forcedClosedBecauseBrokenDirectUrl =
+    isProgramSeed(source) &&
+    !resolvedUrls.directOfficialUrlValid &&
+    parsed.status !== ProgramStatus.CLOSED;
+  const finalStatus = forcedClosedBecauseBrokenDirectUrl ? ProgramStatus.CLOSED : parsed.status;
+  const finalOpenStatusReason = forcedClosedBecauseBrokenDirectUrl
+    ? `La page officielle directe du programme n’est plus valide (${resolvedUrls.directOfficialUrlStatus ?? "statut inconnu"}). Le programme est traité comme fermé ou retiré jusqu’à validation contraire sur une fiche officielle active.`
+    : parsed.openStatusReason;
+  const effectiveParsed: ParsedProgramPayload = forcedClosedBecauseBrokenDirectUrl
+    ? {
+        ...parsed,
+        status: finalStatus,
+        openStatusReason: finalOpenStatusReason,
+        shouldReview: false,
+        reviewFields: parsed.reviewFields.filter((field) => field !== "status"),
+      }
+    : parsed;
 
   const existingProgram = targetProgram
     ? await prisma.fundingProgram.findUnique({
         where: { id: targetProgram.id },
       })
-    : await prisma.fundingProgram.findUnique({
-        where: {
-          slug: parsed.slug,
-        },
-      });
+    : isProgramSeed(source)
+      ? await prisma.fundingProgram.findFirst({
+          where: {
+            sourceId: source.id,
+          },
+          orderBy: {
+            updatedAt: "desc",
+          },
+        })
+      : await prisma.fundingProgram.findUnique({
+          where: {
+            slug: parsed.slug,
+          },
+        });
 
   const storedAnalysis =
     buildProgramAuditAnalysis(aiAnalysis, aiProgramCandidate, document) ??
@@ -373,7 +408,7 @@ async function upsertProgramFromParsedPayload({
     sourceLandingUrl: resolvedUrls.sourceLandingUrl,
     governmentLevel: parsed.governmentLevel,
     region: parsed.region,
-    status: parsed.status,
+    status: finalStatus,
     confidence: parsed.confidence,
     applicantTypes: parsed.applicantTypes,
     sectors: parsed.sectors,
@@ -385,15 +420,15 @@ async function upsertProgramFromParsedPayload({
     details: parsed.details,
     eligibilityNotes: parsed.eligibilityNotes,
     applicationNotes: parsed.applicationNotes,
-    openStatusReason: parsed.openStatusReason,
+    openStatusReason: finalOpenStatusReason,
     sourceId: source.id,
     lastVerifiedAt: new Date(),
     ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
   };
 
-  const program = targetProgram
+  const program = targetProgram || (isProgramSeed(source) && existingProgram)
     ? await prisma.fundingProgram.update({
-        where: { id: targetProgram.id },
+        where: { id: (targetProgram ?? existingProgram)!.id },
         data: programPayload,
       })
     : await prisma.fundingProgram.upsert({
@@ -406,6 +441,17 @@ async function upsertProgramFromParsedPayload({
           ...programPayload,
         },
       });
+
+  if (isProgramSeed(source)) {
+    await prisma.fundingProgram.deleteMany({
+      where: {
+        sourceId: source.id,
+        id: {
+          not: program.id,
+        },
+      },
+    });
+  }
 
   if (targetProgram?.sourceId === source.id) {
     const currentPayload =
@@ -420,6 +466,8 @@ async function upsertProgramFromParsedPayload({
         ...(seedType === "program" ? { url: resolvedUrls.officialUrl } : {}),
         fallbackPayload: buildUpdatedSourceFallbackPayload(source, {
           ...parsed,
+          status: finalStatus,
+          openStatusReason: finalOpenStatusReason,
           officialUrl: resolvedUrls.officialUrl,
           sourceLandingUrl: resolvedUrls.sourceLandingUrl,
         }),
@@ -469,12 +517,12 @@ async function upsertProgramFromParsedPayload({
     });
   }
 
-  const reviewResult = await syncReviewQueueForProgram(program.id, fetchRunId, parsed);
+  const reviewResult = await syncReviewQueueForProgram(program.id, fetchRunId, effectiveParsed);
 
   return {
     discoveredCount: existingProgram ? 0 : 1,
     updatedCount: existingProgram ? 1 : 0,
-    closedCount: parsed.status === ProgramStatus.CLOSED ? 1 : 0,
+    closedCount: finalStatus === ProgramStatus.CLOSED ? 1 : 0,
     reviewCount: reviewResult.reviewCount,
     resolvedReviewCount: reviewResult.resolvedReviewCount,
     voletCount: 1,
