@@ -10,14 +10,24 @@ export async function POST() {
     return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
   }
 
-  const initiatedById =
-    viewer.id === "dev-admin" || viewer.id === "shared-access" ? null : viewer.id;
+  try {
+    const initiatedById =
+      viewer.id === "dev-admin" || viewer.id === "shared-access" ? null : viewer.id;
 
-  const run = await executeFetchRun({
-    mode: ScanMode.MANUAL,
-    scope: ScanScope.GLOBAL,
-    initiatedById,
-  });
+    const run = await executeFetchRun({
+      mode: ScanMode.MANUAL,
+      scope: ScanScope.GLOBAL,
+      initiatedById,
+    });
 
-  return NextResponse.json(run, { status: 202 });
+    return NextResponse.json(run, { status: 202 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Impossible de lancer le scan global.",
+      },
+      { status: 400 },
+    );
+  }
 }

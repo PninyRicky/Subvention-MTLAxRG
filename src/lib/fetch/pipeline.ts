@@ -59,6 +59,7 @@ type ProcessSourceOptions = {
   deepScan: boolean;
   seedUrls?: string[];
   targetProgram?: FundingProgram | null;
+  allowWebEnrichment: boolean;
 };
 
 const SOURCE_PROCESS_CONCURRENCY = 4;
@@ -271,6 +272,7 @@ async function analyzeDocument(
   source: SourceRegistry,
   document: DiscoveredDocument,
   mode: ScanMode,
+  allowWebEnrichment: boolean,
 ): Promise<AiProgramAnalysis | null> {
   if (!isAiEnabled()) {
     return null;
@@ -290,7 +292,7 @@ async function analyzeDocument(
     documentUrl: document.url,
     documentType: document.contentKind,
     depth: document.depth,
-  });
+  }, { allowWebEnrichment });
 
   if (!analysis) {
     return null;
@@ -536,6 +538,7 @@ async function processDocumentForSource({
   mode,
   profiles,
   targetProgram,
+  allowWebEnrichment,
 }: {
   source: SourceRegistry;
   document: DiscoveredDocument;
@@ -543,6 +546,7 @@ async function processDocumentForSource({
   mode: ScanMode;
   profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
   targetProgram?: FundingProgram | null;
+  allowWebEnrichment: boolean;
 }) {
   const metrics = createEmptyMetrics();
 
@@ -557,7 +561,7 @@ async function processDocumentForSource({
     },
   });
 
-  const aiAnalysis = await analyzeDocument(source, document, mode);
+  const aiAnalysis = await analyzeDocument(source, document, mode, allowWebEnrichment);
   const parsedPrograms = parseProgramsFromSource(
     source,
     document.contentKind === "HTML" ? document.rawContent : null,
@@ -730,6 +734,7 @@ async function processSourceForFetchRun({
   deepScan,
   seedUrls,
   targetProgram,
+  allowWebEnrichment,
 }: ProcessSourceOptions) {
   try {
     const discovery = await discoverSourceDocuments(source, {
@@ -746,6 +751,7 @@ async function processSourceForFetchRun({
         mode,
         profiles,
         targetProgram,
+        allowWebEnrichment,
       });
 
       metrics.discoveredCount += documentMetrics.discoveredCount;
@@ -891,6 +897,7 @@ export async function executeFetchRun({
       deepScan: boolean;
       seedUrls?: string[];
       targetProgram?: FundingProgram | null;
+      allowWebEnrichment: boolean;
     }> = [];
 
     if (scope === ScanScope.PROGRAM && targetProgram?.source) {
@@ -899,6 +906,7 @@ export async function executeFetchRun({
         deepScan: true,
         seedUrls: getSeedUrlsForProgram(targetProgram, targetProgram.source),
         targetProgram,
+        allowWebEnrichment: true,
       });
     } else {
       const sources = await prisma.sourceRegistry.findMany({
@@ -918,6 +926,7 @@ export async function executeFetchRun({
         ...sourcesToProcess.map((source) => ({
           source,
           deepScan: false,
+          allowWebEnrichment: false,
         })),
       );
     }
@@ -931,6 +940,7 @@ export async function executeFetchRun({
         deepScan: job.deepScan,
         seedUrls: job.seedUrls,
         targetProgram: job.targetProgram,
+        allowWebEnrichment: job.allowWebEnrichment,
       }),
     );
 
@@ -963,7 +973,7 @@ export async function executeFetchRun({
           scope === ScanScope.PROGRAM
             ? `Scan approfondi ciblé sur le programme avec crawl BFS limité, PDF, volets et URL officielles directes.`
             : mode === ScanMode.MANUAL
-              ? `Scan de veille global avec collecte officielle légère et mise à jour rapide des programmes pertinents.`
+              ? `Scan de veille global sur les sources officielles prioritaires, sans deep crawl massif des portails territoriaux générés.`
               : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
       },
     });

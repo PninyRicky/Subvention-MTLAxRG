@@ -6,7 +6,13 @@ import { LoaderCircle, Radar } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-export function ProgramDeepScanButton({ programId }: { programId: string }) {
+export function ProgramDeepScanButton({
+  programId,
+  compact = false,
+}: {
+  programId: string;
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +43,13 @@ export function ProgramDeepScanButton({ programId }: { programId: string }) {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button variant="secondary" onClick={handleClick} disabled={pending}>
+      <Button variant={compact ? "ghost" : "secondary"} className={compact ? "h-9 px-3" : ""} onClick={handleClick} disabled={pending}>
         {pending ? (
           <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
         ) : (
           <Radar className="mr-2 h-4 w-4" />
         )}
-        Scanner ce programme
+        {compact ? "Scanner" : "Scanner ce programme"}
       </Button>
       {error ? <p className="max-w-[260px] text-right text-xs text-[color:var(--accent)]">{error}</p> : null}
     </div>

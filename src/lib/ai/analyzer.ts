@@ -15,6 +15,10 @@ export type SourceMetadata = {
   depth?: number;
 };
 
+type AnalyzeOptions = {
+  allowWebEnrichment?: boolean;
+};
+
 /**
  * Minimum confidence threshold below which we trigger a web-search enrichment
  * pass to gather more context (deadlines, eligibility, etc.).
@@ -70,10 +74,13 @@ async function callAi(
 export async function analyzeProgramPage(
   bodyText: string,
   sourceMetadata: SourceMetadata,
+  options: AnalyzeOptions = {},
 ): Promise<AiProgramAnalysis | null> {
   if (!isAiEnabled()) {
     return null;
   }
+
+  const allowWebEnrichment = options.allowWebEnrichment ?? true;
 
   const currentDate = getTorontoLocalDateKey();
 
@@ -87,7 +94,7 @@ export async function analyzeProgramPage(
     if (!firstPass || !firstPass.programs.length) return null;
 
     // --- Pass 2: web-search enrichment when needed ---
-    if (needsEnrichment(firstPass)) {
+    if (allowWebEnrichment && needsEnrichment(firstPass)) {
       const webContext = await searchWebForProgramContext(
         sourceMetadata.sourceName,
         sourceMetadata.sourceUrl,

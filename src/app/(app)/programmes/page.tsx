@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
+import { ProgramDeepScanButton } from "@/components/program-deep-scan-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { buildInstitutionProgramWhere, getInstitutionConfig, getInstitutionNavLinks } from "@/lib/institutions";
 import { prisma } from "@/lib/prisma";
@@ -243,7 +244,10 @@ export default async function ProgrammesPage({
                           <Link href={`/programmes/${program.id}`} className="block space-y-2">
                             <p className="text-base font-medium">{program.name}</p>
                           </Link>
-                          <FavoriteToggleButton programId={program.id} isFavorite={program.isFavorite} compact />
+                          <div className="flex items-center gap-2">
+                            <ProgramDeepScanButton programId={program.id} compact />
+                            <FavoriteToggleButton programId={program.id} isFavorite={program.isFavorite} compact />
+                          </div>
                         </div>
                         <Link href={`/programmes/${program.id}`} className="block space-y-2">
                         <p className="text-sm text-black/60">{program.organization}</p>

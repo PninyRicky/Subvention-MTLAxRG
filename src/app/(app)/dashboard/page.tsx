@@ -3,6 +3,7 @@ import { ProgramStatus } from "@prisma/client";
 import { ArrowUpRight } from "lucide-react";
 
 import { DashboardFilters } from "@/components/dashboard-filters";
+import { ProgramDeepScanButton } from "@/components/program-deep-scan-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
@@ -108,10 +109,9 @@ export default async function DashboardPage({
                 program.status === "OPEN" ? "open" : program.status === "REVIEW" ? "review" : "closed";
 
               return (
-                <Link
+                <div
                   key={program.id}
-                  href={`/programmes/${program.id}`}
-                  className="block rounded-[28px] border border-black/10 px-5 py-5 transition hover:border-black"
+                  className="rounded-[28px] border border-black/10 px-5 py-5 transition hover:border-black"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="max-w-2xl">
@@ -120,18 +120,23 @@ export default async function DashboardPage({
                         {topMatch?.status === "ELIGIBLE" ? <Badge tone="eligible">Match fort</Badge> : null}
                         <span className="text-xs uppercase tracking-[0.18em] text-black/42">{program.organization}</span>
                       </div>
-                      <h3 className="mt-3 text-xl font-medium tracking-[-0.04em]">{program.name}</h3>
-                      <p className="mt-2 text-sm leading-6 text-black/66">{program.summary}</p>
+                      <Link href={`/programmes/${program.id}`} className="block">
+                        <h3 className="mt-3 text-xl font-medium tracking-[-0.04em]">{program.name}</h3>
+                        <p className="mt-2 text-sm leading-6 text-black/66">{program.summary}</p>
+                      </Link>
                     </div>
 
                     <div className="min-w-[220px] text-sm text-black/64">
+                      <div className="mb-3 flex justify-end">
+                        <ProgramDeepScanButton programId={program.id} compact />
+                      </div>
                       <p className="font-medium text-black">Score: {topMatch?.score ?? 0}</p>
                       <p className="mt-1">Niveau: {program.governmentLevel}</p>
                       <p className="mt-1">Région: {program.region}</p>
                       <p className="mt-1">Dernière vérification: {formatDateTime(program.lastVerifiedAt)}</p>
                     </div>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
