@@ -3,12 +3,15 @@ import { ScanStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/dates";
+import { expireStaleFetchRuns } from "@/lib/fetch/pipeline";
 import { getScheduleLabel } from "@/lib/scheduler";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScansPage() {
+  await expireStaleFetchRuns();
+
   const runs = await prisma.fetchRun.findMany({
     include: {
       initiatedBy: true,
