@@ -82,6 +82,7 @@ export default async function ProgrammesPage({
       updatedAt: true,
       officialUrl: true,
       isFavorite: true,
+      eligibleProfessionalServices: true,
       intakeWindows: {
         orderBy: {
           closesAt: "asc",
@@ -247,6 +248,11 @@ export default async function ProgrammesPage({
                         <Link href={`/programmes/${program.id}`} className="block space-y-2">
                         <p className="text-sm text-black/60">{program.organization}</p>
                         <p className="max-w-xl text-sm leading-6 text-black/66">{program.summary}</p>
+                        {program.eligibleProfessionalServices ? (
+                          <div className="pt-1">
+                            <Badge tone="eligible">Services professionnels admissibles</Badge>
+                          </div>
+                        ) : null}
                         </Link>
                       </div>
                     </td>

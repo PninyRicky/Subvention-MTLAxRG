@@ -36,9 +36,10 @@ export default async function ScansPage() {
         <Card>
           <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Regles d’execution</p>
           <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
-            <li>Les scans manuels utilisent exactement le meme pipeline que les scans planifies.</li>
+            <li>Les scans manuels utilisent un crawl officiel profond BFS limite avec pages HTML et PDF.</li>
+            <li>Les scans planifies restent plus legers pour preserver la stabilite sur Vercel.</li>
             <li>Le bouton de scan se bloque si un run est deja en cours ou en file.</li>
-            <li>Chaque run journalise les sources, documents, creations, mises a jour et cas a revoir.</li>
+            <li>Chaque run journalise les sources, documents, volets crees, fermetures et cas a revoir.</li>
           </ul>
         </Card>
 
@@ -52,6 +53,7 @@ export default async function ScansPage() {
                   <th className="px-6 py-4 font-medium">Lancement</th>
                   <th className="px-6 py-4 font-medium">Sources</th>
                   <th className="px-6 py-4 font-medium">Documents</th>
+                  <th className="px-6 py-4 font-medium">Crawl</th>
                   <th className="px-6 py-4 font-medium">Resultat</th>
                 </tr>
               </thead>
@@ -74,9 +76,16 @@ export default async function ScansPage() {
                       <td className="px-6 py-5 text-sm text-black/64">{run.sourceCount}</td>
                       <td className="px-6 py-5 text-sm text-black/64">{run.documents.length}</td>
                       <td className="px-6 py-5 text-sm leading-6 text-black/64">
+                        <p>HTML: {run.htmlPageCount}</p>
+                        <p>PDF: {run.pdfCount}</p>
+                        <p>Volets: {run.voletCount}</p>
+                      </td>
+                      <td className="px-6 py-5 text-sm leading-6 text-black/64">
                         <p>Nouveaux: {run.discoveredCount}</p>
                         <p>Maj: {run.updatedCount}</p>
+                        <p>Fermes: {run.closedCount}</p>
                         <p>A revoir: {run.reviewCount}</p>
+                        <p>Revisions resolues: {run.resolvedReviewCount}</p>
                       </td>
                     </tr>
                   );

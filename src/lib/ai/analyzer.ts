@@ -4,12 +4,15 @@ import { searchWebForProgramContext } from "@/lib/fetch/web-search";
 
 import { getAiClient, isAiEnabled } from "./provider";
 import { buildSystemPrompt, buildEnrichedUserPrompt, buildUserPrompt } from "./prompts";
-import { aiProgramAnalysisSchema, type AiProgramAnalysis } from "./schema";
+import { aiProgramAnalysisSchema, type AiProgramAnalysis, type AiProgramEntry } from "./schema";
 
 export type SourceMetadata = {
   sourceName: string;
   sourceUrl: string;
   governmentLevel: string;
+  documentUrl?: string;
+  documentType?: "HTML" | "PDF";
+  depth?: number;
 };
 
 /**
@@ -18,13 +21,21 @@ export type SourceMetadata = {
  */
 const ENRICHMENT_CONFIDENCE_THRESHOLD = 65;
 
-function needsEnrichment(analysis: AiProgramAnalysis): boolean {
-  if ((analysis.confidence ?? 0) < ENRICHMENT_CONFIDENCE_THRESHOLD) return true;
-  if (!analysis.officialUrl) return true;
-  if (!analysis.programName) return true;
-  if (!analysis.closesAt && !analysis.rolling) return true;
-  if (analysis.status === "REVIEW") return true;
+function shouldEnrichProgram(program: AiProgramEntry): boolean {
+  if ((program.confidence ?? 0) < ENRICHMENT_CONFIDENCE_THRESHOLD) return true;
+  if (!program.officialUrl) return true;
+  if (!program.programName) return true;
+  if (!program.closesAt && !program.rolling) return true;
+  if (program.status === "REVIEW") return true;
   return false;
+}
+
+function needsEnrichment(analysis: AiProgramAnalysis): boolean {
+  if (!analysis.programs.length) {
+    return true;
+  }
+
+  return analysis.programs.some(shouldEnrichProgram);
 }
 
 async function callAi(
@@ -73,7 +84,7 @@ export async function analyzeProgramPage(
       { role: "user", content: buildUserPrompt(sourceMetadata, bodyText) },
     ]);
 
-    if (!firstPass) return null;
+    if (!firstPass || !firstPass.programs.length) return null;
 
     // --- Pass 2: web-search enrichment when needed ---
     if (needsEnrichment(firstPass)) {
@@ -96,8 +107,13 @@ export async function analyzeProgramPage(
           },
         ]);
 
-        if (enriched && (enriched.confidence ?? 0) >= (firstPass.confidence ?? 0)) {
-          return enriched;
+        if (enriched && enriched.programs.length > 0) {
+          const firstPassConfidence = Math.max(...firstPass.programs.map((program) => program.confidence ?? 0));
+          const enrichedConfidence = Math.max(...enriched.programs.map((program) => program.confidence ?? 0));
+
+          if (enrichedConfidence >= firstPassConfidence) {
+            return enriched;
+          }
         }
       }
     }

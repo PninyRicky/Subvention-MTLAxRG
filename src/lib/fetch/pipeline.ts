@@ -2,72 +2,60 @@ import { Prisma, ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceR
 
 import { analyzeProgramPage } from "@/lib/ai/analyzer";
 import { isAiEnabled } from "@/lib/ai/provider";
-import type { AiProgramAnalysis } from "@/lib/ai/schema";
+import type { AiProgramAnalysis, AiProgramEntry } from "@/lib/ai/schema";
 import { env } from "@/lib/env";
-import { parseProgramFromSource } from "@/lib/fetch/parsers";
+import { discoverSourceDocuments, type DiscoveredDocument } from "@/lib/fetch/deep-scan";
+import { parseProgramsFromSource, type ParsedProgramPayload } from "@/lib/fetch/parsers";
 import { resolveWorkingOfficialUrls } from "@/lib/link-validation";
 import { prisma } from "@/lib/prisma";
 import { scoreProgramForProfile } from "@/lib/scoring";
 import { hasRunToday } from "@/lib/scheduler";
 import { isOfficialInstitutionUrl } from "@/lib/source-registry";
-import { hashContent } from "@/lib/utils";
 
 type PipelineOptions = {
   mode: ScanMode;
   initiatedById?: string | null;
 };
 
-type ParsedProgram = ReturnType<typeof parseProgramFromSource>;
-type CachedAiProgramAnalysis = AiProgramAnalysis & { analysisVersion?: number };
+type CachedAiProgramAnalysis = AiProgramAnalysis & {
+  analysisVersion?: number;
+  documentUrl?: string;
+  documentType?: "HTML" | "PDF";
+  depth?: number;
+};
 
-const SOURCE_FETCH_TIMEOUT_MS = 8_000;
-const SOURCE_FETCH_MAX_ATTEMPTS = 2;
+type ProcessingMetrics = {
+  discoveredCount: number;
+  updatedCount: number;
+  closedCount: number;
+  reviewCount: number;
+  resolvedReviewCount: number;
+  voletCount: number;
+  htmlPageCount: number;
+  pdfCount: number;
+  failed: boolean;
+};
+
 const SOURCE_PROCESS_CONCURRENCY = 4;
 const STALE_FETCH_RUN_TIMEOUT_MS = 20 * 60 * 1000;
 const REVIEW_REASON = "Informations incomplètes ou ambiguës après collecte.";
-const AI_ANALYSIS_CACHE_VERSION = 2;
+const AI_ANALYSIS_CACHE_VERSION = 3;
 
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function createEmptyMetrics(): ProcessingMetrics {
+  return {
+    discoveredCount: 0,
+    updatedCount: 0,
+    closedCount: 0,
+    reviewCount: 0,
+    resolvedReviewCount: 0,
+    voletCount: 0,
+    htmlPageCount: 0,
+    pdfCount: 0,
+    failed: false,
+  };
 }
 
-async function fetchSourceHtml(source: SourceRegistry) {
-  let lastError: unknown = null;
-
-  for (let attempt = 1; attempt <= SOURCE_FETCH_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(source.url, {
-        signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
-        headers: {
-          "user-agent": "MTLA-Subventions/1.0 (+https://mtla.productions)",
-        },
-        next: {
-          revalidate: 0,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < SOURCE_FETCH_MAX_ATTEMPTS) {
-        await wait(350 * attempt);
-      }
-    }
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    console.warn(`Echec de collecte pour ${source.url}:`, lastError);
-  }
-
-  return null;
-}
-
-async function syncReviewQueueForProgram(programId: string, fetchRunId: string, parsed: ParsedProgram) {
+async function syncReviewQueueForProgram(programId: string, fetchRunId: string, parsed: ParsedProgramPayload) {
   const pendingReviews = await prisma.reviewQueue.findMany({
     where: {
       programId,
@@ -80,7 +68,7 @@ async function syncReviewQueueForProgram(programId: string, fetchRunId: string, 
 
   if (!parsed.shouldReview) {
     if (!pendingReviews.length) {
-      return 0;
+      return { reviewCount: 0, resolvedReviewCount: 0 };
     }
 
     await prisma.reviewQueue.updateMany({
@@ -96,7 +84,7 @@ async function syncReviewQueueForProgram(programId: string, fetchRunId: string, 
       },
     });
 
-    return 0;
+    return { reviewCount: 0, resolvedReviewCount: pendingReviews.length };
   }
 
   const [primaryReview, ...duplicateReviews] = pendingReviews;
@@ -139,7 +127,10 @@ async function syncReviewQueueForProgram(programId: string, fetchRunId: string, 
     });
   }
 
-  return 1;
+  return {
+    reviewCount: 1,
+    resolvedReviewCount: duplicateReviews.length,
+  };
 }
 
 export async function expireStaleFetchRuns() {
@@ -180,6 +171,348 @@ export async function expireStaleFetchRuns() {
   return staleRuns.length;
 }
 
+function buildProgramAuditAnalysis(
+  aiAnalysis: AiProgramAnalysis | null,
+  candidate: AiProgramEntry | null,
+  document: DiscoveredDocument,
+) {
+  if (!aiAnalysis) {
+    return null;
+  }
+
+  return {
+    ...aiAnalysis,
+    analysisVersion: AI_ANALYSIS_CACHE_VERSION,
+    documentUrl: document.url,
+    documentTitle: document.title,
+    documentType: document.contentKind,
+    depth: document.depth,
+    selectedProgramName: candidate?.programName ?? null,
+    selectedOfficialUrl: candidate?.officialUrl ?? null,
+    selectedReviewReason: candidate?.reviewReason ?? null,
+  };
+}
+
+async function getCachedAnalysisForDocument(sourceId: string, document: DiscoveredDocument) {
+  const existingDoc = await prisma.sourceDocument.findFirst({
+    where: {
+      sourceId,
+      url: document.url,
+      contentHash: document.contentHash,
+    },
+    orderBy: {
+      fetchedAt: "desc",
+    },
+  });
+
+  if (!existingDoc) {
+    return null;
+  }
+
+  const existingProgram = await prisma.fundingProgram.findFirst({
+    where: {
+      sourceId,
+      aiAnalysis: { not: Prisma.AnyNull },
+    },
+    select: {
+      aiAnalysis: true,
+    },
+  });
+
+  const cached = existingProgram?.aiAnalysis as CachedAiProgramAnalysis | null;
+
+  if (
+    cached &&
+    (cached.analysisVersion ?? 1) >= AI_ANALYSIS_CACHE_VERSION &&
+    cached.documentUrl === document.url &&
+    Array.isArray(cached.programs)
+  ) {
+    return cached;
+  }
+
+  return null;
+}
+
+async function analyzeDocument(
+  source: SourceRegistry,
+  document: DiscoveredDocument,
+  mode: ScanMode,
+): Promise<AiProgramAnalysis | null> {
+  if (!isAiEnabled()) {
+    return null;
+  }
+
+  if (mode !== ScanMode.MANUAL) {
+    const cached = await getCachedAnalysisForDocument(source.id, document);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const analysis = await analyzeProgramPage(document.textContent, {
+    sourceName: source.name,
+    sourceUrl: source.url,
+    governmentLevel: source.governmentLevel ?? "A confirmer",
+    documentUrl: document.url,
+    documentType: document.contentKind,
+    depth: document.depth,
+  });
+
+  if (!analysis) {
+    return null;
+  }
+
+  return {
+    ...analysis,
+    analysisVersion: AI_ANALYSIS_CACHE_VERSION,
+    documentUrl: document.url,
+    documentType: document.contentKind,
+    depth: document.depth,
+  } as CachedAiProgramAnalysis;
+}
+
+function buildManualFallbackAnalysis(parsed: ParsedProgramPayload): AiProgramEntry {
+  return {
+    programName: parsed.name,
+    officialUrl: parsed.officialUrl,
+    status: parsed.status,
+    statusReason: parsed.openStatusReason,
+    closesAt: parsed.intakeWindow.closesAt?.toISOString().slice(0, 10) ?? null,
+    opensAt: parsed.intakeWindow.opensAt?.toISOString().slice(0, 10) ?? null,
+    rolling: parsed.intakeWindow.rolling,
+    organization: parsed.organization,
+    summary: parsed.summary,
+    maxAmount: parsed.maxAmount,
+    maxCoveragePct: parsed.maxCoveragePct,
+    applicantTypes: parsed.applicantTypes,
+    sectors: parsed.sectors,
+    projectStages: parsed.projectStages,
+    eligibleExpenses: parsed.eligibleExpenses,
+    eligibleProfessionalServices: parsed.eligibleProfessionalServices,
+    eligibilityNotes: parsed.eligibilityNotes,
+    applicationNotes: parsed.applicationNotes,
+    details: parsed.details,
+    confidence: parsed.confidence,
+    reviewReason: parsed.shouldReview ? parsed.reviewFields.join(", ") : null,
+  };
+}
+
+async function upsertProgramFromParsedPayload({
+  source,
+  parsed,
+  profiles,
+  fetchRunId,
+  aiAnalysis,
+  aiProgramCandidate,
+  document,
+}: {
+  source: SourceRegistry;
+  parsed: ParsedProgramPayload;
+  profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
+  fetchRunId: string;
+  aiAnalysis: AiProgramAnalysis | null;
+  aiProgramCandidate: AiProgramEntry | null;
+  document: DiscoveredDocument;
+}) {
+  const resolvedUrls = await resolveWorkingOfficialUrls({
+    officialUrl: parsed.officialUrl,
+    sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
+    sourceUrl: source.url,
+  });
+
+  const existingProgram = await prisma.fundingProgram.findUnique({
+    where: {
+      slug: parsed.slug,
+    },
+  });
+
+  const storedAnalysis =
+    buildProgramAuditAnalysis(aiAnalysis, aiProgramCandidate, document) ??
+    buildProgramAuditAnalysis(
+      { programs: [buildManualFallbackAnalysis(parsed)] },
+      buildManualFallbackAnalysis(parsed),
+      document,
+    );
+
+  const program = await prisma.fundingProgram.upsert({
+    where: {
+      slug: parsed.slug,
+    },
+    update: {
+      name: parsed.name,
+      organization: parsed.organization,
+      summary: parsed.summary,
+      officialUrl: resolvedUrls.officialUrl,
+      sourceLandingUrl: resolvedUrls.sourceLandingUrl,
+      governmentLevel: parsed.governmentLevel,
+      region: parsed.region,
+      status: parsed.status,
+      confidence: parsed.confidence,
+      applicantTypes: parsed.applicantTypes,
+      sectors: parsed.sectors,
+      projectStages: parsed.projectStages,
+      eligibleExpenses: parsed.eligibleExpenses,
+      eligibleProfessionalServices: parsed.eligibleProfessionalServices,
+      maxAmount: parsed.maxAmount,
+      maxCoveragePct: parsed.maxCoveragePct,
+      details: parsed.details,
+      eligibilityNotes: parsed.eligibilityNotes,
+      applicationNotes: parsed.applicationNotes,
+      openStatusReason: parsed.openStatusReason,
+      sourceId: source.id,
+      lastVerifiedAt: new Date(),
+      ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
+    },
+    create: {
+      slug: parsed.slug,
+      name: parsed.name,
+      organization: parsed.organization,
+      summary: parsed.summary,
+      officialUrl: resolvedUrls.officialUrl,
+      sourceLandingUrl: resolvedUrls.sourceLandingUrl,
+      governmentLevel: parsed.governmentLevel,
+      region: parsed.region,
+      status: parsed.status,
+      confidence: parsed.confidence,
+      details: parsed.details,
+      eligibilityNotes: parsed.eligibilityNotes,
+      applicationNotes: parsed.applicationNotes,
+      applicantTypes: parsed.applicantTypes,
+      sectors: parsed.sectors,
+      projectStages: parsed.projectStages,
+      eligibleExpenses: parsed.eligibleExpenses,
+      eligibleProfessionalServices: parsed.eligibleProfessionalServices,
+      maxAmount: parsed.maxAmount,
+      maxCoveragePct: parsed.maxCoveragePct,
+      openStatusReason: parsed.openStatusReason,
+      sourceId: source.id,
+      lastVerifiedAt: new Date(),
+      ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
+    },
+  });
+
+  await prisma.intakeWindow.deleteMany({
+    where: {
+      programId: program.id,
+    },
+  });
+
+  await prisma.intakeWindow.create({
+    data: {
+      programId: program.id,
+      rolling: parsed.intakeWindow.rolling,
+      opensAt: parsed.intakeWindow.opensAt ?? null,
+      closesAt: parsed.intakeWindow.closesAt ?? null,
+      lastConfirmedAt: new Date(),
+    },
+  });
+
+  const hydratedProgram = await prisma.fundingProgram.findUniqueOrThrow({
+    where: { id: program.id },
+    include: {
+      intakeWindows: true,
+    },
+  });
+
+  for (const profile of profiles) {
+    const result = scoreProgramForProfile(hydratedProgram, profile);
+
+    await prisma.matchResult.upsert({
+      where: {
+        programId_profileId: {
+          programId: hydratedProgram.id,
+          profileId: profile.id,
+        },
+      },
+      update: result,
+      create: {
+        ...result,
+        programId: hydratedProgram.id,
+        profileId: profile.id,
+      },
+    });
+  }
+
+  const reviewResult = await syncReviewQueueForProgram(program.id, fetchRunId, parsed);
+
+  return {
+    discoveredCount: existingProgram ? 0 : 1,
+    updatedCount: existingProgram ? 1 : 0,
+    closedCount: parsed.status === ProgramStatus.CLOSED ? 1 : 0,
+    reviewCount: reviewResult.reviewCount,
+    resolvedReviewCount: reviewResult.resolvedReviewCount,
+    voletCount: 1,
+  };
+}
+
+async function processDocumentForSource({
+  source,
+  document,
+  fetchRunId,
+  mode,
+  profiles,
+}: {
+  source: SourceRegistry;
+  document: DiscoveredDocument;
+  fetchRunId: string;
+  mode: ScanMode;
+  profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
+}) {
+  const metrics = createEmptyMetrics();
+
+  await prisma.sourceDocument.create({
+    data: {
+      sourceId: source.id,
+      fetchRunId,
+      url: document.url,
+      title: document.title,
+      rawContent: document.rawContent,
+      contentHash: document.contentHash,
+    },
+  });
+
+  const aiAnalysis = await analyzeDocument(source, document, mode);
+  const parsedPrograms = parseProgramsFromSource(
+    source,
+    document.contentKind === "HTML" ? document.rawContent : null,
+    (source.fallbackPayload ?? null) as Record<string, unknown> | null,
+    aiAnalysis,
+    document.textContent,
+  );
+
+  const aiPrograms = aiAnalysis?.programs ?? [];
+
+  for (const parsed of parsedPrograms) {
+    const aiProgramCandidate =
+      aiPrograms.find((candidate) => candidate.programName && parsed.name.includes(candidate.programName)) ??
+      aiPrograms.find((candidate) => candidate.officialUrl === parsed.officialUrl) ??
+      aiPrograms[0] ??
+      null;
+
+    const programMetrics = await upsertProgramFromParsedPayload({
+      source,
+      parsed,
+      profiles,
+      fetchRunId,
+      aiAnalysis,
+      aiProgramCandidate,
+      document,
+    });
+
+    metrics.discoveredCount += programMetrics.discoveredCount;
+    metrics.updatedCount += programMetrics.updatedCount;
+    metrics.closedCount += programMetrics.closedCount;
+    metrics.reviewCount += programMetrics.reviewCount;
+    metrics.resolvedReviewCount += programMetrics.resolvedReviewCount;
+    metrics.voletCount += programMetrics.voletCount;
+  }
+
+  metrics.htmlPageCount += document.contentKind === "HTML" ? 1 : 0;
+  metrics.pdfCount += document.contentKind === "PDF" ? 1 : 0;
+
+  return metrics;
+}
+
 async function processSourceForFetchRun({
   source,
   fetchRunId,
@@ -192,193 +525,36 @@ async function processSourceForFetchRun({
   profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
 }) {
   try {
-    const html = await fetchSourceHtml(source);
-    const rawContent = html ?? JSON.stringify(source.fallbackPayload ?? {});
-    const contentHash = hashContent(rawContent);
+    const discovery = await discoverSourceDocuments(source, mode === ScanMode.MANUAL);
+    const metrics = createEmptyMetrics();
 
-    let aiAnalysis: CachedAiProgramAnalysis | null = null;
-    if (isAiEnabled()) {
-      const existingDoc = await prisma.sourceDocument.findFirst({
-        where: { sourceId: source.id, contentHash },
-        orderBy: { fetchedAt: "desc" },
-      });
-
-      const existingAi = existingDoc
-        ? await prisma.fundingProgram.findFirst({
-            where: { sourceId: source.id, aiAnalysis: { not: Prisma.AnyNull } },
-            select: { aiAnalysis: true },
-          })
-        : null;
-      const cachedAnalysis = existingAi?.aiAnalysis as CachedAiProgramAnalysis | null;
-      const canReuseCachedAnalysis =
-        mode !== ScanMode.MANUAL &&
-        cachedAnalysis &&
-        (cachedAnalysis.analysisVersion ?? 1) >= AI_ANALYSIS_CACHE_VERSION;
-
-      if (canReuseCachedAnalysis) {
-        aiAnalysis = cachedAnalysis;
-      } else {
-        const bodyText = html
-          ? html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
-          : JSON.stringify(source.fallbackPayload ?? {});
-        const freshAnalysis = await analyzeProgramPage(bodyText, {
-          sourceName: source.name,
-          sourceUrl: source.url,
-          governmentLevel: source.governmentLevel ?? "A confirmer",
-        });
-        aiAnalysis = freshAnalysis ? { ...freshAnalysis, analysisVersion: AI_ANALYSIS_CACHE_VERSION } : null;
-      }
-    }
-
-    const parsed = parseProgramFromSource(
-      source,
-      html,
-      (source.fallbackPayload ?? null) as Record<string, unknown> | null,
-      aiAnalysis,
-    );
-    const resolvedUrls = await resolveWorkingOfficialUrls({
-      officialUrl: parsed.officialUrl,
-      sourceLandingUrl: parsed.sourceLandingUrl ?? source.url,
-      sourceUrl: source.url,
-    });
-
-    await prisma.sourceDocument.create({
-      data: {
-        sourceId: source.id,
+    for (const document of discovery.documents) {
+      const documentMetrics = await processDocumentForSource({
+        source,
+        document,
         fetchRunId,
-        url: source.url,
-        title: parsed.name,
-        rawContent,
-        contentHash,
-      },
-    });
-
-    const existingProgram = await prisma.fundingProgram.findUnique({
-      where: {
-        slug: parsed.slug,
-      },
-      include: {
-        intakeWindows: true,
-        matchResults: true,
-      },
-    });
-
-    const program = await prisma.fundingProgram.upsert({
-      where: {
-        slug: parsed.slug,
-      },
-      update: {
-        name: parsed.name,
-        organization: parsed.organization,
-        summary: parsed.summary,
-        officialUrl: resolvedUrls.officialUrl,
-        sourceLandingUrl: resolvedUrls.sourceLandingUrl,
-        governmentLevel: parsed.governmentLevel,
-        region: parsed.region,
-        status: parsed.status,
-        confidence: parsed.confidence,
-        applicantTypes: parsed.applicantTypes,
-        sectors: parsed.sectors,
-        projectStages: parsed.projectStages,
-        eligibleExpenses: parsed.eligibleExpenses,
-        maxAmount: parsed.maxAmount,
-        maxCoveragePct: parsed.maxCoveragePct,
-        details: parsed.details,
-        eligibilityNotes: parsed.eligibilityNotes,
-        applicationNotes: parsed.applicationNotes,
-        openStatusReason: parsed.openStatusReason,
-        sourceId: source.id,
-        lastVerifiedAt: new Date(),
-        ...(aiAnalysis ? { aiAnalysis, aiAnalyzedAt: new Date() } : {}),
-      },
-      create: {
-        slug: parsed.slug,
-        name: parsed.name,
-        organization: parsed.organization,
-        summary: parsed.summary,
-        officialUrl: resolvedUrls.officialUrl,
-        sourceLandingUrl: resolvedUrls.sourceLandingUrl,
-        governmentLevel: parsed.governmentLevel,
-        region: parsed.region,
-        status: parsed.status,
-        confidence: parsed.confidence,
-        details: parsed.details,
-        eligibilityNotes: parsed.eligibilityNotes,
-        applicationNotes: parsed.applicationNotes,
-        applicantTypes: parsed.applicantTypes,
-        sectors: parsed.sectors,
-        projectStages: parsed.projectStages,
-        eligibleExpenses: parsed.eligibleExpenses,
-        maxAmount: parsed.maxAmount,
-        maxCoveragePct: parsed.maxCoveragePct,
-        openStatusReason: parsed.openStatusReason,
-        sourceId: source.id,
-        lastVerifiedAt: new Date(),
-        ...(aiAnalysis ? { aiAnalysis, aiAnalyzedAt: new Date() } : {}),
-      },
-    });
-
-    await prisma.intakeWindow.deleteMany({
-      where: {
-        programId: program.id,
-      },
-    });
-
-    await prisma.intakeWindow.create({
-      data: {
-        programId: program.id,
-        rolling: parsed.intakeWindow.rolling,
-        opensAt: parsed.intakeWindow.opensAt ?? null,
-        closesAt: parsed.intakeWindow.closesAt ?? null,
-        lastConfirmedAt: new Date(),
-      },
-    });
-
-    const hydratedProgram = await prisma.fundingProgram.findUniqueOrThrow({
-      where: { id: program.id },
-      include: {
-        intakeWindows: true,
-      },
-    });
-
-    for (const profile of profiles) {
-      const result = scoreProgramForProfile(hydratedProgram, profile);
-
-      await prisma.matchResult.upsert({
-        where: {
-          programId_profileId: {
-            programId: hydratedProgram.id,
-            profileId: profile.id,
-          },
-        },
-        update: result,
-        create: {
-          ...result,
-          programId: hydratedProgram.id,
-          profileId: profile.id,
-        },
+        mode,
+        profiles,
       });
+
+      metrics.discoveredCount += documentMetrics.discoveredCount;
+      metrics.updatedCount += documentMetrics.updatedCount;
+      metrics.closedCount += documentMetrics.closedCount;
+      metrics.reviewCount += documentMetrics.reviewCount;
+      metrics.resolvedReviewCount += documentMetrics.resolvedReviewCount;
+      metrics.voletCount += documentMetrics.voletCount;
+      metrics.htmlPageCount += documentMetrics.htmlPageCount;
+      metrics.pdfCount += documentMetrics.pdfCount;
     }
 
-    const reviewCount = await syncReviewQueueForProgram(program.id, fetchRunId, parsed);
-
-    return {
-      discoveredCount: existingProgram ? 0 : 1,
-      updatedCount: existingProgram ? 1 : 0,
-      closedCount: parsed.status === ProgramStatus.CLOSED ? 1 : 0,
-      reviewCount,
-      failed: false,
-    };
+    return metrics;
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(`Echec de traitement pour ${source.url}:`, error);
     }
 
     return {
-      discoveredCount: 0,
-      updatedCount: 0,
-      closedCount: 0,
-      reviewCount: 0,
+      ...createEmptyMetrics(),
       failed: true,
     };
   }
@@ -466,6 +642,10 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
     let updatedCount = 0;
     let closedCount = 0;
     let reviewCount = 0;
+    let resolvedReviewCount = 0;
+    let htmlPageCount = 0;
+    let pdfCount = 0;
+    let voletCount = 0;
     const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
     const sourceResults = await mapWithConcurrency(officialSources, SOURCE_PROCESS_CONCURRENCY, (source) =>
       processSourceForFetchRun({
@@ -481,6 +661,10 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       updatedCount += result.updatedCount;
       closedCount += result.closedCount;
       reviewCount += result.reviewCount;
+      resolvedReviewCount += result.resolvedReviewCount;
+      htmlPageCount += result.htmlPageCount;
+      pdfCount += result.pdfCount;
+      voletCount += result.voletCount;
     }
 
     return await prisma.fetchRun.update({
@@ -492,11 +676,15 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
         updatedCount,
         closedCount,
         reviewCount,
+        resolvedReviewCount,
+        htmlPageCount,
+        pdfCount,
+        voletCount,
         finishedAt: new Date(),
         notes:
           mode === ScanMode.MANUAL
-            ? `Scan lance manuellement depuis l'interface avec concurrence ${SOURCE_PROCESS_CONCURRENCY}.`
-            : `Scan planifie par le scheduler Vercel avec concurrence ${SOURCE_PROCESS_CONCURRENCY}.`,
+            ? `Deep scan manuel officiel avec crawl BFS limité, HTML/PDF et extraction multi-volets.`
+            : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
       },
     });
   } catch (error) {

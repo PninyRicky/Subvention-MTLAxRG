@@ -12,6 +12,7 @@ type FallbackPayloadSeed = {
   organization: string;
   summary: string;
   officialUrl: string;
+  seedType?: "portal" | "program" | "calendar";
   governmentLevel: string;
   region: string;
   status: "OPEN" | "REVIEW" | "CLOSED";
@@ -23,6 +24,7 @@ type FallbackPayloadSeed = {
   sectors: string[];
   projectStages: string[];
   eligibleExpenses: string[];
+  eligibleProfessionalServices?: boolean | null;
   maxAmount: string | null;
   maxCoveragePct: number | null;
   openStatusReason: string;
@@ -213,10 +215,11 @@ export const defaultProfiles: ProfileSeed[] = [
       excludedKeywords: ["capital", "immobilier lourd"],
     },
     weights: {
-      serviceFit: 30,
-      applicantFit: 25,
+      serviceFit: 26,
+      applicantFit: 22,
       geographyFit: 10,
-      expenseFit: 20,
+      expenseFit: 17,
+      professionalServicesFit: 15,
       deadlineFit: 5,
       confidenceFit: 10,
     },
@@ -243,6 +246,7 @@ export const defaultProfiles: ProfileSeed[] = [
       applicantFit: 20,
       geographyFit: 10,
       expenseFit: 18,
+      professionalServicesFit: 0,
       deadlineFit: 10,
       confidenceFit: 10,
     },
@@ -267,6 +271,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Programme officiel de la SODEC pour appuyer le developpement de projets audiovisuels au Quebec.",
       officialUrl:
         "https://sodec.gouv.qc.ca/domaines-dintervention/cinema-et-television/aide-financiere/aide-developpement/",
+      seedType: "program",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "REVIEW",
@@ -298,6 +303,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Portail officiel du CALQ pour les aides destinees aux artistes, organismes et collectifs du Quebec.",
       officialUrl: "https://www.calq.gouv.qc.ca/aide-financiere/obtenir-aide-financiere/",
+      seedType: "portal",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "REVIEW",
@@ -329,6 +335,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Subvention federale pour le developpement, la creation et l'experimentation de projets artistiques.",
       officialUrl: "https://conseildesarts.ca/financement/subventions/explorer-et-creer",
+      seedType: "program",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -360,6 +367,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Catalogue officiel des programmes de Telefilm pour le developpement, la production et la promotion d'oeuvres audiovisuelles.",
       officialUrl: "https://telefilm.ca/fr/programmes/",
+      seedType: "portal",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -391,6 +399,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Catalogue officiel des programmes de financement du Fonds des medias du Canada pour television, medias numeriques et contenus convergents.",
       officialUrl: "https://cmf-fmc.ca/fr/nos-programmes/programmes-et-dates-limites/",
+      seedType: "calendar",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -422,6 +431,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Portail officiel pour reperer les subventions et contributions de Patrimoine canadien en culture, patrimoine, langues et collectivites.",
       officialUrl: "https://www.canada.ca/fr/patrimoine-canadien/services/financement.html",
+      seedType: "portal",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -453,6 +463,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Programme fédéral destiné aux groupes locaux pour des festivals, événements et projets qui célèbrent l’histoire, le patrimoine et la participation culturelle d’une communauté.",
       officialUrl: "https://www.canada.ca/fr/patrimoine-canadien/services/financement/developpement-communautes.html",
+      seedType: "portal",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -467,6 +478,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["culture", "patrimoine", "rayonnement", "participation culturelle"],
       projectStages: ["developpement", "production", "diffusion"],
       eligibleExpenses: ["diffusion", "contenu culturel", "rayonnement", "mediation"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le volet",
       maxCoveragePct: null,
       openStatusReason:
@@ -486,6 +498,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Volet fédéral destiné aux projets partenariaux qui renforcent les opérations, les pratiques d’affaires, les revenus et l’usage stratégique des technologies dans les organismes artistiques et patrimoniaux.",
       officialUrl:
         "https://www.canada.ca/fr/patrimoine-canadien/services/financement/fonds-investissement-culture/initiatives-strategiques.html",
+      seedType: "program",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -500,6 +513,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["developpement organisationnel", "communications", "rayonnement", "developpement numerique"],
       projectStages: ["developpement"],
       eligibleExpenses: ["developpement numerique", "communications", "strategie", "rayonnement"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le projet",
       maxCoveragePct: null,
       openStatusReason:
@@ -518,6 +532,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Programme fédéral de financement pluriannuel destiné à offrir un financement stable aux organismes artistiques et de soutien.",
       officialUrl: "https://conseildesarts.ca/financement/subventions/subventions-de-base-aux-organismes",
+      seedType: "program",
       governmentLevel: "Federal",
       region: "Canada",
       status: "REVIEW",
@@ -532,6 +547,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["culture", "arts", "developpement organisationnel", "rayonnement"],
       projectStages: ["developpement", "diffusion"],
       eligibleExpenses: ["fonctionnement", "communications", "rayonnement", "developpement organisationnel"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon l’organisme",
       maxCoveragePct: null,
       openStatusReason:
@@ -550,6 +566,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       summary:
         "Programme québécois destiné aux organismes à but non lucratif des domaines de la culture et des communications pour soutenir leur autonomie financière et leurs collectes de fonds.",
       officialUrl: "https://www.quebec.ca/culture/aide-financiere/mecenat-culture/programme-mecenat-placements-culture",
+      seedType: "program",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "OPEN",
@@ -564,6 +581,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["communications", "culture", "developpement organisationnel", "rayonnement"],
       projectStages: ["developpement"],
       eligibleExpenses: ["collecte de fonds", "developpement organisationnel", "communications"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le volet",
       maxCoveragePct: null,
       openStatusReason:
@@ -586,6 +604,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Programme québécois qui vise à soutenir le développement de la culture et des communications par la concertation et des initiatives partenariales.",
       officialUrl:
         "https://www.quebec.ca/culture/aide-financiere/initiatives-de-partenariat/aide-aux-initiatives-de-partenariat",
+      seedType: "program",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "REVIEW",
@@ -600,6 +619,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["communications", "culture", "rayonnement", "partenariat"],
       projectStages: ["developpement", "diffusion"],
       eligibleExpenses: ["communications", "rayonnement", "contenu numerique", "mediation"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le partenariat",
       maxCoveragePct: null,
       openStatusReason:
@@ -619,6 +639,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Programme québécois destiné aux organismes de regroupement qui offrent des services d’expertise-conseil, de communication, de regroupement, de formation et de développement.",
       officialUrl:
         "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/organismes-regroupement/programme-aide-au-fonctionnement-pour-les-organismes-de-regroupement-pafor",
+      seedType: "program",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "REVIEW",
@@ -633,6 +654,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["communications", "developpement organisationnel", "formation", "rayonnement"],
       projectStages: ["developpement"],
       eligibleExpenses: ["communications", "developpement organisationnel", "formation", "mutualisation"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le programme",
       maxCoveragePct: 100,
       openStatusReason:
@@ -652,6 +674,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Programme québécois destiné aux organismes culturels d’action communautaire afin de soutenir leur offre de services adaptée aux communautés et groupes qui rencontrent des obstacles à la participation culturelle.",
       officialUrl:
         "https://www.quebec.ca/culture/aide-financiere/aide-au-fonctionnement/aide-au-fonctionnement-pour-les-organismes-culturels-daction-communautaire",
+      seedType: "program",
       governmentLevel: "Quebec",
       region: "Quebec",
       status: "CLOSED",
@@ -666,6 +689,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["culture", "participation culturelle", "mediation", "rayonnement"],
       projectStages: ["developpement", "diffusion"],
       eligibleExpenses: ["fonctionnement", "communications", "mediation", "rayonnement"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le programme",
       maxCoveragePct: null,
       openStatusReason:
@@ -689,6 +713,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
         "Programme municipal permettant aux organismes reconnus de réaliser des projets qui améliorent la qualité de vie de la population et renforcent la vitalité des communautés.",
       officialUrl:
         "https://www.longueuil.quebec/fr/services/developpement-social/programmes-daide-financieres-aux-menages-et-organismes",
+      seedType: "portal",
       governmentLevel: "Municipal",
       region: "Montérégie",
       status: "REVIEW",
@@ -703,6 +728,7 @@ export const defaultOfficialSources: OfficialSourceSeed[] = [
       sectors: ["developpement social", "organismes", "rayonnement", "developpement organisationnel"],
       projectStages: ["developpement", "diffusion"],
       eligibleExpenses: ["communications", "rayonnement", "developpement organisationnel", "projet communautaire"],
+      eligibleProfessionalServices: true,
       maxAmount: "Selon le programme",
       maxCoveragePct: null,
       openStatusReason:

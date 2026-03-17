@@ -17,6 +17,7 @@ type ProfileWeights = {
   applicantFit: number;
   geographyFit: number;
   expenseFit: number;
+  professionalServicesFit: number;
   deadlineFit: number;
   confidenceFit: number;
 };
@@ -113,6 +114,7 @@ export function scoreProgramForProfile(program: ProgramWithWindow, profile: Serv
     applicantFit: 25,
     geographyFit: 10,
     expenseFit: 20,
+    professionalServicesFit: 10,
     deadlineFit: 5,
     confidenceFit: 10,
   });
@@ -142,6 +144,8 @@ export function scoreProgramForProfile(program: ProgramWithWindow, profile: Serv
   const confidenceScore = Math.min(1, program.confidence / 100);
   const deadlineScore = getDeadlineScore(program);
   const currentlyOpen = program.intakeWindows.some((window) => isOpenToday(window));
+  const professionalServicesScore =
+    profile.scenario === "essence-marque" && program.eligibleProfessionalServices === true ? 1 : 0;
 
   if (applicantScore > 0) {
     reasons.push("Type de demandeur compatible.");
@@ -151,6 +155,9 @@ export function scoreProgramForProfile(program: ProgramWithWindow, profile: Serv
   }
   if (expenseScore > 0.25) {
     reasons.push("Depenses admissibles pertinentes.");
+  }
+  if (professionalServicesScore > 0) {
+    reasons.push("Les services professionnels ou externes semblent admissibles.");
   }
   if (!currentlyOpen || program.status !== ProgramStatus.OPEN) {
     uncertainties.push("Statut d'ouverture a confirmer ou en revision.");
@@ -164,6 +171,7 @@ export function scoreProgramForProfile(program: ProgramWithWindow, profile: Serv
     applicantScore * weights.applicantFit +
     geographyScore * weights.geographyFit +
     expenseScore * weights.expenseFit +
+    professionalServicesScore * weights.professionalServicesFit +
     deadlineScore * weights.deadlineFit +
     confidenceScore * weights.confidenceFit;
 

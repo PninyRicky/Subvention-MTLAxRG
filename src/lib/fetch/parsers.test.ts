@@ -1,7 +1,7 @@
 import { SourceType, type SourceRegistry } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import { parseProgramFromSource } from "@/lib/fetch/parsers";
+import { parseProgramFromSource, parseProgramsFromSource } from "@/lib/fetch/parsers";
 
 const source = {
   id: "source-1",
@@ -53,7 +53,7 @@ describe("parseProgramFromSource", () => {
     });
 
     expect(parsed.status).toBe("CLOSED");
-    expect(parsed.openStatusReason).toMatch(/passe/i);
+    expect(parsed.openStatusReason).toMatch(/passée/i);
   });
 
   it("integre les donnees AI quand disponibles", () => {
@@ -66,23 +66,31 @@ describe("parseProgramFromSource", () => {
         officialUrl: "https://sodec.gouv.qc.ca/test",
       },
       {
-        status: "OPEN",
-        statusReason: "Le programme accepte les demandes.",
-        closesAt: "2027-06-15",
-        opensAt: null,
-        rolling: false,
-        organization: "SODEC via AI",
-        summary: "Resume enrichi par AI",
-        maxAmount: "50 000 $",
-        maxCoveragePct: 75,
-        applicantTypes: ["Producteur delegue"],
-        sectors: ["cinema"],
-        projectStages: null,
-        eligibleExpenses: null,
-        eligibilityNotes: "Admissible aux producteurs",
-        applicationNotes: null,
-        details: "Detail enrichi par AI",
-        confidence: 82,
+        programs: [
+          {
+            programName: "SODEC - Test AI",
+            officialUrl: "https://sodec.gouv.qc.ca/test",
+            status: "OPEN",
+            statusReason: "Le programme accepte les demandes.",
+            closesAt: "2027-06-15",
+            opensAt: null,
+            rolling: false,
+            organization: "SODEC via AI",
+            summary: "Resume enrichi par AI",
+            maxAmount: "50 000 $",
+            maxCoveragePct: 75,
+            applicantTypes: ["Producteur delegue"],
+            sectors: ["cinema"],
+            projectStages: null,
+            eligibleExpenses: null,
+            eligibleProfessionalServices: false,
+            eligibilityNotes: "Admissible aux producteurs",
+            applicationNotes: null,
+            details: "Detail enrichi par AI",
+            confidence: 82,
+            reviewReason: null,
+          },
+        ],
       },
     );
 
@@ -92,6 +100,73 @@ describe("parseProgramFromSource", () => {
     expect(parsed.details).toBe("Detail enrichi par AI");
     expect(parsed.applicantTypes).toContain("Producteur delegue");
     expect(parsed.intakeWindow.closesAt?.toISOString()).toContain("2027-06-15");
+  });
+
+  it("retourne plusieurs volets distincts a partir de l'analyse AI", () => {
+    const parsedPrograms = parseProgramsFromSource(
+      source,
+      null,
+      {
+        name: "Programme portail",
+        summary: "Portail officiel",
+        officialUrl: source.url,
+      },
+      {
+        programs: [
+          {
+            programName: "Volet 1 - Rayonnement",
+            officialUrl: "https://sodec.gouv.qc.ca/volet-1",
+            status: "OPEN",
+            statusReason: "Volet ouvert",
+            closesAt: "2027-03-15",
+            opensAt: "2027-01-05",
+            rolling: false,
+            organization: "SODEC",
+            summary: "Volet 1",
+            maxAmount: null,
+            maxCoveragePct: null,
+            applicantTypes: ["OBNL"],
+            sectors: ["rayonnement"],
+            projectStages: ["developpement"],
+            eligibleExpenses: ["communications"],
+            eligibleProfessionalServices: true,
+            eligibilityNotes: null,
+            applicationNotes: null,
+            details: null,
+            confidence: 78,
+            reviewReason: null,
+          },
+          {
+            programName: "Volet 2 - Numérique",
+            officialUrl: "https://sodec.gouv.qc.ca/volet-2",
+            status: "REVIEW",
+            statusReason: "Date a confirmer",
+            closesAt: null,
+            opensAt: null,
+            rolling: null,
+            organization: "SODEC",
+            summary: "Volet 2",
+            maxAmount: null,
+            maxCoveragePct: null,
+            applicantTypes: ["OBNL"],
+            sectors: ["developpement numerique"],
+            projectStages: ["developpement"],
+            eligibleExpenses: ["outils numeriques"],
+            eligibleProfessionalServices: true,
+            eligibilityNotes: null,
+            applicationNotes: null,
+            details: null,
+            confidence: 75,
+            reviewReason: "Date non explicite",
+          },
+        ],
+      },
+    );
+
+    expect(parsedPrograms).toHaveLength(2);
+    expect(parsedPrograms[0].slug).not.toBe(parsedPrograms[1].slug);
+    expect(parsedPrograms[0].eligibleProfessionalServices).toBe(true);
+    expect(parsedPrograms[1].shouldReview).toBe(true);
   });
 
   it("repere un lien fonds ou programmes depuis un portail regional generique", () => {

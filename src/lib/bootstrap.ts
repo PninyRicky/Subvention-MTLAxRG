@@ -72,6 +72,7 @@ async function upsertGeneratedMrcSources() {
           summary:
             `Portail officiel de ${entry.name} pour repérer ses fonds, programmes, ententes culturelles et leviers de financement territoriaux.`,
           officialUrl: website,
+          seedType: "portal",
           governmentLevel: "Regional",
           region: entry.regionName,
           status: "REVIEW",
@@ -86,6 +87,7 @@ async function upsertGeneratedMrcSources() {
           sectors: ["culture", "patrimoine", "développement territorial", "rayonnement", "développement organisationnel"],
           projectStages: ["développement", "production", "diffusion"],
           eligibleExpenses: ["projet culturel", "rayonnement", "médiation", "fonctionnement", "initiative structurante"],
+          eligibleProfessionalServices: null,
           maxAmount: "Selon le programme",
           maxCoveragePct: null,
           openStatusReason:
@@ -105,6 +107,7 @@ async function upsertGeneratedMrcSources() {
           summary:
             `Portail officiel de ${entry.name} pour repérer ses fonds, programmes, ententes culturelles et leviers de financement territoriaux.`,
           officialUrl: website,
+          seedType: "portal",
           governmentLevel: "Regional",
           region: entry.regionName,
           status: "REVIEW",
@@ -119,6 +122,7 @@ async function upsertGeneratedMrcSources() {
           sectors: ["culture", "patrimoine", "développement territorial", "rayonnement", "développement organisationnel"],
           projectStages: ["développement", "production", "diffusion"],
           eligibleExpenses: ["projet culturel", "rayonnement", "médiation", "fonctionnement", "initiative structurante"],
+          eligibleProfessionalServices: null,
           maxAmount: "Selon le programme",
           maxCoveragePct: null,
           openStatusReason:
@@ -238,6 +242,10 @@ async function ensureSourcePrograms() {
       sectors: Array.isArray(payload.sectors) ? (payload.sectors as string[]) : [],
       projectStages: Array.isArray(payload.projectStages) ? (payload.projectStages as string[]) : [],
       eligibleExpenses: Array.isArray(payload.eligibleExpenses) ? (payload.eligibleExpenses as string[]) : [],
+      eligibleProfessionalServices:
+        typeof payload.eligibleProfessionalServices === "boolean"
+          ? payload.eligibleProfessionalServices
+          : null,
       openStatusReason: payload.openStatusReason ? String(payload.openStatusReason) : null,
       sourceId: source.id,
       lastVerifiedAt: new Date(),

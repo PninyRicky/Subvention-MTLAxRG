@@ -3,82 +3,92 @@ export function buildSystemPrompt(currentDate: string) {
 
 DATE D'AUJOURD'HUI : ${currentDate}
 
-Tu reçois le texte brut d'une page Web officielle d'un programme ou d'un portail de financement, et parfois des informations complémentaires recueillies sur le Web officiel. Ta tâche est d'extraire les informations structurées en JSON.
+Tu reçois le texte brut d'une page Web officielle ou d'un PDF officiel. Ton travail consiste à identifier le ou les volets officiels réellement décrits dans les textes fournis, puis à extraire un JSON structuré.
 
 RÈGLES STRICTES :
 1. Extrais UNIQUEMENT ce qui est EXPLICITEMENT écrit dans les textes fournis. Ne devine jamais, ne fabrique rien.
-2. Si une information n'est PAS clairement présente dans le texte, retourne null pour ce champ.
-3. Pour le statut (status) :
+2. Si une information n'est PAS clairement présente, retourne null pour ce champ.
+3. Retourne une liste "programs". Chaque entrée de "programs" doit représenter UN volet, UN sous-programme ou UN programme officiel distinct.
+4. Si la page est un portail général mais qu'un sous-programme ou un volet précis est explicitement identifiable dans les textes, retourne le sous-programme, pas le portail.
+5. Si aucun volet clair n'est isolé, retourne un seul objet avec status "REVIEW" et un reviewReason explicite.
+6. Pour le statut (status) :
    - "OPEN" : le programme accepte activement des demandes ET une date limite FUTURE est mentionnée, OU il est indiqué "en continu" / "en tout temps".
-   - "CLOSED" : la date limite est passée, OU la page dit "fermé", "terminé", "complet", "aucune nouvelle demande".
-   - "REVIEW" : tu n'es pas certain. Le programme existe mais tu ne peux pas confirmer s'il est ouvert ou fermé.
-4. Pour les dates (closesAt, opensAt) : retourne au format ISO 8601 (ex: "2026-05-15"). Si la date mentionnée est dans le passé par rapport à aujourd'hui (${currentDate}), le statut DOIT être "CLOSED".
-5. Pour "rolling" : true UNIQUEMENT si la page dit explicitement "en continu", "en tout temps", "programme permanent", "aucune date limite".
-6. Pour les listes (applicantTypes, sectors, etc.) : extrais les termes tels qu'écrits sur la page. Ne reformule pas.
-7. Pour "confidence" : ton niveau de certitude global de 0 à 100 sur la qualité de ton analyse.
-8. Résume en français.
-9. Si la source est un portail ou une page de catalogue et qu'un sous-programme officiel plus précis est clairement identifié dans les textes fournis, retourne ce sous-programme dans "programName" et son URL officielle directe dans "officialUrl".
-10. "officialUrl" doit pointer vers la page officielle DU PROGRAMME précis, pas vers la page d'accueil du site ni vers un portail général, sauf si aucun lien plus précis n'est fourni dans les textes.
-11. Les sources tierces n'ont AUCUNE priorité. Si les extraits complémentaires contredisent la page officielle, la page officielle l'emporte.
-12. Si les textes disent explicitement "la période de dépôt s'est terminée", "date limite dépassée", "fermé", "terminé", le statut doit être "CLOSED" même si le programme existe encore.
+   - "CLOSED" : la date limite est passée, OU la page dit "fermé", "terminé", "complet", "aucune nouvelle demande", "la période de dépôt s'est terminée".
+   - "REVIEW" : le programme existe mais tu ne peux pas confirmer formellement s'il est ouvert ou fermé.
+7. Pour les dates (closesAt, opensAt) : retourne au format ISO 8601 (YYYY-MM-DD). Si la date mentionnée est dans le passé par rapport à aujourd'hui (${currentDate}), le statut DOIT être "CLOSED".
+8. Pour "rolling" : true UNIQUEMENT si la page dit explicitement "en continu", "en tout temps", "programme permanent" ou "aucune date limite".
+9. "officialUrl" doit pointer vers la page officielle DU VOLET précis, pas vers la page d'accueil du site ni vers un portail général, sauf si aucun lien plus précis n'est explicitement présent dans les textes.
+10. Les sources tierces n'ont AUCUNE priorité. Si des extraits complémentaires contredisent la page officielle, la page officielle l'emporte.
+11. Résume toujours en français.
+12. Priorise les sections ou documents mentionnant : "volet", "guide", "cadre normatif", "conditions d'octroi", "dépenses admissibles", "admissibilité", "calendrier", "date limite", "dépôt des demandes".
 
-ATTENTION AUX DATES LIMITES :
-- Cherche attentivement les dates dans TOUT le texte : dates de dépôt, dates limites, échéances, fin de programme.
-- Les formats courants incluent : "avant le 15 mai 2026", "date limite : 2026-05-15", "dépôt en continu", etc.
-- Si plusieurs dates existent, prends la prochaine date limite FUTURE la plus proche.
-- Si une phrase dit explicitement qu'une période de dépôt s'est terminée à une date passée, prends cette date comme closesAt.
-- Regarde aussi les mentions de "volet", "appel de projets", "appel à projets" qui peuvent contenir des dates spécifiques.
+ATTENTION SPÉCIFIQUE AUX DÉPENSES ADMISSIBLES :
+- Cherche explicitement si les dépenses admissibles incluent ou non :
+  "honoraires professionnels", "consultants", "services de consultants", "accompagnement", "outils numériques", "SaaS", "développement organisationnel", "communications", "rayonnement", "rédaction de demandes".
+- Si ces dépenses sont explicitement admissibles, retourne eligibleProfessionalServices = true.
+- Si la page dit explicitement que ces dépenses sont non admissibles, retourne eligibleProfessionalServices = false.
+- Sinon retourne null.
 
-ATTENTION À LA PRÉCISION DU PROGRAMME :
-- Si la page couvre plusieurs programmes, priorise le programme ou le sous-programme le plus précis explicitement décrit dans les textes fournis.
-- Si les textes montrent un meilleur lien officiel vers le sous-programme, retourne-le dans "officialUrl".
-- Si tu n'as pas de lien direct explicite, retourne null pour "officialUrl" plutôt qu'une URL inventée.
-
-RETOURNE UNIQUEMENT un objet JSON valide, sans commentaire ni texte autour.
+RETOURNE UNIQUEMENT un objet JSON valide, sans commentaire autour.
 
 Schéma attendu :
 {
-  "programName": "nom exact du programme ou du sous-programme" | null,
-  "officialUrl": "https://..." | null,
-  "status": "OPEN" | "CLOSED" | "REVIEW" | null,
-  "statusReason": "explication courte en français" | null,
-  "closesAt": "YYYY-MM-DD" | null,
-  "opensAt": "YYYY-MM-DD" | null,
-  "rolling": true | false | null,
-  "organization": "nom de l'organisme" | null,
-  "summary": "résumé en 1-2 phrases" | null,
-  "maxAmount": "montant max en texte" | null,
-  "maxCoveragePct": nombre | null,
-  "applicantTypes": ["type1", "type2"] | null,
-  "sectors": ["secteur1", "secteur2"] | null,
-  "projectStages": ["étape1"] | null,
-  "eligibleExpenses": ["dépense1"] | null,
-  "eligibilityNotes": "notes d'admissibilité" | null,
-  "applicationNotes": "notes de dépôt" | null,
-  "details": "description détaillée" | null,
-  "confidence": nombre 0-100 | null
+  "programs": [
+    {
+      "programName": "nom exact du volet ou du programme" | null,
+      "officialUrl": "https://..." | null,
+      "status": "OPEN" | "CLOSED" | "REVIEW" | null,
+      "statusReason": "explication courte en français" | null,
+      "closesAt": "YYYY-MM-DD" | null,
+      "opensAt": "YYYY-MM-DD" | null,
+      "rolling": true | false | null,
+      "organization": "nom de l'organisme" | null,
+      "summary": "résumé en 1-2 phrases" | null,
+      "maxAmount": "montant max en texte" | null,
+      "maxCoveragePct": nombre | null,
+      "applicantTypes": ["type1", "type2"] | null,
+      "sectors": ["secteur1", "secteur2"] | null,
+      "projectStages": ["étape1"] | null,
+      "eligibleExpenses": ["dépense1"] | null,
+      "eligibleProfessionalServices": true | false | null,
+      "eligibilityNotes": "notes d'admissibilité" | null,
+      "applicationNotes": "notes de dépôt" | null,
+      "details": "description détaillée" | null,
+      "confidence": nombre 0-100 | null,
+      "reviewReason": "raison d'audit humain si ambigu" | null
+    }
+  ]
 }`;
 }
 
-export function buildUserPrompt(sourceMetadata: {
-  sourceName: string;
-  sourceUrl: string;
-  governmentLevel: string;
-}, bodyText: string) {
-  const truncated = bodyText.slice(0, 8000);
+export function buildUserPrompt(
+  sourceMetadata: {
+    sourceName: string;
+    sourceUrl: string;
+    governmentLevel: string;
+    documentUrl?: string;
+    documentType?: "HTML" | "PDF";
+    depth?: number;
+  },
+  bodyText: string,
+) {
+  const truncated = bodyText.slice(0, 12000);
 
   return `SOURCE : ${sourceMetadata.sourceName}
-URL : ${sourceMetadata.sourceUrl}
+URL SOURCE : ${sourceMetadata.sourceUrl}
+URL DOCUMENT : ${sourceMetadata.documentUrl ?? sourceMetadata.sourceUrl}
+TYPE DOCUMENT : ${sourceMetadata.documentType ?? "HTML"}
+PROFONDEUR DE CRAWL : ${sourceMetadata.depth ?? 0}
 NIVEAU GOUVERNEMENTAL : ${sourceMetadata.governmentLevel}
-OBJECTIF MÉTIER PRIORITAIRE : repérer des programmes officiels réellement utiles pour des OBNL et organismes voulant financer rayonnement, communications, contenu, présence numérique, participation culturelle ou développement organisationnel.
+OBJECTIF MÉTIER PRIORITAIRE : repérer des programmes officiels réellement utiles pour des OBNL et organismes voulant financer rayonnement, communications, contenu, présence numérique, image de marque, participation culturelle ou développement organisationnel.
 
-CONTENU DE LA PAGE :
+CONTENU OFFICIEL :
 ---
 ${truncated}
 ---
 
-Analyse cette page et retourne le JSON structuré.
-Si cette page est un portail, essaie d'identifier le sous-programme officiel le plus précis explicitement visible dans le contenu.`;
+Analyse ce document officiel et retourne le JSON structuré.
+S'il contient plusieurs volets ou sous-programmes, retourne-les tous séparément dans "programs".`;
 }
 
 export function buildEnrichedUserPrompt(
@@ -86,25 +96,31 @@ export function buildEnrichedUserPrompt(
     sourceName: string;
     sourceUrl: string;
     governmentLevel: string;
+    documentUrl?: string;
+    documentType?: "HTML" | "PDF";
+    depth?: number;
   },
   bodyText: string,
   webSnippets: string,
   webSources: string[],
 ) {
-  const truncatedBody = bodyText.slice(0, 6000);
-  const truncatedWeb = webSnippets.slice(0, 6000);
+  const truncatedBody = bodyText.slice(0, 9000);
+  const truncatedWeb = webSnippets.slice(0, 5000);
 
   return `SOURCE : ${sourceMetadata.sourceName}
-URL : ${sourceMetadata.sourceUrl}
+URL SOURCE : ${sourceMetadata.sourceUrl}
+URL DOCUMENT : ${sourceMetadata.documentUrl ?? sourceMetadata.sourceUrl}
+TYPE DOCUMENT : ${sourceMetadata.documentType ?? "HTML"}
+PROFONDEUR DE CRAWL : ${sourceMetadata.depth ?? 0}
 NIVEAU GOUVERNEMENTAL : ${sourceMetadata.governmentLevel}
-OBJECTIF MÉTIER PRIORITAIRE : repérer des programmes officiels réellement utiles pour des OBNL et organismes voulant financer rayonnement, communications, contenu, présence numérique, participation culturelle ou développement organisationnel.
+OBJECTIF MÉTIER PRIORITAIRE : repérer des programmes officiels réellement utiles pour des OBNL et organismes voulant financer rayonnement, communications, contenu, présence numérique, image de marque, participation culturelle ou développement organisationnel.
 
-CONTENU DE LA PAGE OFFICIELLE :
+CONTENU DE LA PAGE OFFICIELLE OU DU PDF :
 ---
 ${truncatedBody}
 ---
 
-INFORMATIONS COMPLÉMENTAIRES TROUVÉES SUR LE WEB :
+INFORMATIONS COMPLÉMENTAIRES TROUVÉES SUR LE WEB OFFICIEL :
 Les extraits suivants proviennent d'une recherche Web ciblée.
 Privilégie en priorité absolue les pages officielles et institutionnelles.
 Utilise ces extraits UNIQUEMENT pour compléter ou confirmer les informations manquantes:
@@ -112,6 +128,7 @@ Utilise ces extraits UNIQUEMENT pour compléter ou confirmer les informations ma
 - statut ouvert/fermé
 - lien direct du sous-programme officiel
 - admissibilité
+- dépenses admissibles
 - montants
 En cas de conflit, la page officielle a priorité absolue.
 Sources : ${webSources.join(", ")}
@@ -119,8 +136,6 @@ Sources : ${webSources.join(", ")}
 ${truncatedWeb}
 ---
 
-Analyse l'ensemble de ces informations et retourne le JSON structuré.
-Porte une attention particulière aux DATES LIMITES, au STATUT (ouvert/fermé) et au LIEN DIRECT DU PROGRAMME.
-Si une date limite apparaît dans une autre page officielle du même organisme, tu peux l'utiliser.
-Si tu identifies une URL plus précise du sous-programme officiel, retourne-la dans "officialUrl".`
+Analyse l'ensemble et retourne le JSON structuré.
+Retourne une entrée distincte dans "programs" pour chaque volet réellement identifié.`;
 }

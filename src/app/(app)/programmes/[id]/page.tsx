@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { parseJsonField } from "@/lib/utils";
 
 export default async function ProgrammeDetailPage({
   params,
@@ -39,6 +40,12 @@ export default async function ProgrammeDetailPage({
 
   const tone =
     program.status === "OPEN" ? "open" : program.status === "REVIEW" ? "review" : "closed";
+  const audit = parseJsonField<Record<string, unknown> | null>(program.aiAnalysis, null);
+  const selectedProgramName =
+    typeof audit?.selectedProgramName === "string" ? audit.selectedProgramName : program.name;
+  const auditPrograms = Array.isArray(audit?.programs) ? (audit.programs as Array<Record<string, unknown>>) : [];
+  const selectedAuditProgram =
+    auditPrograms.find((entry) => entry["programName"] === selectedProgramName) ?? auditPrograms[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -77,6 +84,14 @@ export default async function ProgrammeDetailPage({
             <p>
               <span className="font-medium text-black">Couverture:</span>{" "}
               {program.maxCoveragePct ? `${program.maxCoveragePct}%` : "À confirmer"}
+            </p>
+            <p>
+              <span className="font-medium text-black">Services professionnels:</span>{" "}
+              {program.eligibleProfessionalServices === true
+                ? "Admissibles"
+                : program.eligibleProfessionalServices === false
+                  ? "Non admissibles"
+                  : "À confirmer"}
             </p>
             <a
               href={program.officialUrl}
@@ -150,6 +165,17 @@ export default async function ProgrammeDetailPage({
             </div>
 
             <div className="mt-6 rounded-[28px] border border-black/10 bg-black/[0.02] p-5">
+              <p className="text-sm font-medium">Services professionnels</p>
+              <p className="mt-2 text-sm leading-6 text-black/66">
+                {program.eligibleProfessionalServices === true
+                  ? "Le scan a détecté un signal officiel indiquant que les honoraires professionnels, consultants, services externes ou outils numériques peuvent être admissibles."
+                  : program.eligibleProfessionalServices === false
+                    ? "Le scan a détecté un signal officiel indiquant que les services professionnels ou consultants ne sont pas admissibles."
+                    : "Le scan n’a pas trouvé de signal suffisamment explicite sur l’admissibilité des services professionnels."}
+              </p>
+            </div>
+
+            <div className="mt-6 rounded-[28px] border border-black/10 bg-black/[0.02] p-5">
               <p className="text-sm font-medium">Justification du statut</p>
               <p className="mt-2 text-sm leading-6 text-black/66">{program.openStatusReason ?? "Aucune justification détaillée."}</p>
             </div>
@@ -208,6 +234,52 @@ export default async function ProgrammeDetailPage({
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Audit du scan</p>
+            <div className="mt-4 space-y-2 text-sm leading-6 text-black/66">
+              <p>
+                <span className="font-medium text-black">Document analysé:</span>{" "}
+                {typeof audit?.documentUrl === "string" ? (
+                  <a
+                    href={audit.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[color:var(--accent)] underline-offset-4 hover:underline"
+                  >
+                    {audit.documentUrl}
+                  </a>
+                ) : (
+                  "À confirmer"
+                )}
+              </p>
+              <p>
+                <span className="font-medium text-black">Type de document:</span>{" "}
+                {typeof audit?.documentType === "string" ? audit.documentType : "À confirmer"}
+              </p>
+              <p>
+                <span className="font-medium text-black">Volet retenu:</span> {selectedProgramName}
+              </p>
+              <p>
+                <span className="font-medium text-black">Raison du statut:</span>{" "}
+                {typeof selectedAuditProgram?.["statusReason"] === "string"
+                  ? selectedAuditProgram["statusReason"]
+                  : program.openStatusReason}
+              </p>
+              {typeof selectedAuditProgram?.["reviewReason"] === "string" && selectedAuditProgram["reviewReason"] ? (
+                <p>
+                  <span className="font-medium text-black">Raison de révision:</span>{" "}
+                  {selectedAuditProgram["reviewReason"] as string}
+                </p>
+              ) : null}
+              <p>
+                <span className="font-medium text-black">Date de clôture détectée:</span>{" "}
+                {typeof selectedAuditProgram?.["closesAt"] === "string" && selectedAuditProgram["closesAt"]
+                  ? (selectedAuditProgram["closesAt"] as string)
+                  : "À confirmer"}
+              </p>
+            </div>
+          </Card>
+
           <Card>
             <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Source</p>
             <div className="mt-4 space-y-2 text-sm leading-6 text-black/66">

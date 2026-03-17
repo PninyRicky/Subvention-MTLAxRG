@@ -134,6 +134,7 @@ model FundingProgram {
   sectors          String[]
   projectStages    String[]
   eligibleExpenses String[]
+  eligibleProfessionalServices Boolean?
   openStatusReason String?
   aiAnalysis       Json?
   aiAnalyzedAt     DateTime?
@@ -212,6 +213,10 @@ model FetchRun {
   updatedCount    Int              @default(0)
   closedCount     Int              @default(0)
   reviewCount     Int              @default(0)
+  htmlPageCount   Int              @default(0)
+  pdfCount        Int              @default(0)
+  voletCount      Int              @default(0)
+  resolvedReviewCount Int          @default(0)
   initiatedById   String?
   notes           String?
   error           String?
