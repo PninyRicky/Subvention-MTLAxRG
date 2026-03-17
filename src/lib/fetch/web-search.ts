@@ -1,3 +1,7 @@
+import { z } from "zod";
+
+import { getXaiClient, isXaiSearchEnabled } from "@/lib/ai/provider";
+import { env } from "@/lib/env";
 import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 
 const SEARCH_TIMEOUT_MS = 6_000;
@@ -5,6 +9,9 @@ const MAX_RESULTS = 8;
 const MAX_SNIPPET_LENGTH = 800;
 const RESULTS_PER_QUERY = 4;
 const FETCHED_PAGE_COUNT = 5;
+const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_HINTS = 3;
+const MAX_HINT_QUERIES = 2;
 
 type SearchResult = {
   title: string;
@@ -12,11 +19,113 @@ type SearchResult = {
   snippet: string;
 };
 
-/**
- * Searches DuckDuckGo HTML for grant-related information.
- * Returns plain-text snippets that can be appended to the AI prompt
- * so the model has extra context about deadlines, eligibility, etc.
- */
+type WebSearchContext = {
+  snippets: string;
+  sources: string[];
+};
+
+type CachedSearchContext = {
+  expiresAt: number;
+  value: WebSearchContext | null;
+};
+
+const HELLODARWIN_HOSTS = new Set(["hellodarwin.com", "www.hellodarwin.com"]);
+const searchCache = new Map<string, CachedSearchContext>();
+
+const xaiSearchResponseSchema = z.object({
+  results: z
+    .array(
+      z.object({
+        title: z.string().default(""),
+        url: z.string().url(),
+        snippet: z.string().default(""),
+      }),
+    )
+    .default([]),
+});
+
+function buildCacheKey(sourceName: string, sourceUrl: string) {
+  return `${sourceName}::${sourceUrl}`.toLowerCase().trim();
+}
+
+function getCachedContext(cacheKey: string) {
+  const entry = searchCache.get(cacheKey);
+
+  if (!entry) {
+    return undefined;
+  }
+
+  if (entry.expiresAt < Date.now()) {
+    searchCache.delete(cacheKey);
+    return undefined;
+  }
+
+  return entry.value;
+}
+
+function setCachedContext(cacheKey: string, value: WebSearchContext | null) {
+  searchCache.set(cacheKey, {
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+    value,
+  });
+
+  if (searchCache.size > 250) {
+    const oldestKey = searchCache.keys().next().value;
+    if (oldestKey) {
+      searchCache.delete(oldestKey);
+    }
+  }
+}
+
+function isHelloDarwinUrl(url: string): boolean {
+  try {
+    return HELLODARWIN_HOSTS.has(new URL(url).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function normalizeSearchUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (/^(utm_|fbclid|gclid|mc_eid|mc_cid)/i.test(key)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+
+    const normalized = parsed.toString().replace(/\/$/, "");
+    return normalized;
+  } catch {
+    return url.trim();
+  }
+}
+
+function cleanHintText(value: string) {
+  return value
+    .replace(/HelloDarwin/gi, "")
+    .replace(/hellodarwin\.com/gi, "")
+    .replace(/https?:\/\/[^\s]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyUsefulHint(value: string) {
+  const normalized = value.toLowerCase();
+  const requiredSignals = ["programme", "subvention", "aide", "fonds", "volet"];
+  return requiredSignals.some((signal) => normalized.includes(signal));
+}
+
 async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q: query, kl: "ca-fr" });
   const url = `https://html.duckduckgo.com/html/?${params.toString()}`;
@@ -35,9 +144,6 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
 
   const html = await response.text();
   const results: SearchResult[] = [];
-
-  // Extract result blocks from DuckDuckGo HTML response.
-  // Each result lives inside a <div class="result..."> with an <a class="result__a"> and <a class="result__snippet">.
   const resultBlocks = html.split(/class="result\s/);
 
   for (const block of resultBlocks.slice(1, MAX_RESULTS + 1)) {
@@ -53,44 +159,113 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
       .trim()
       .slice(0, MAX_SNIPPET_LENGTH);
 
-    if (!title || !snippet) continue;
+    if (!title || !snippet) {
+      continue;
+    }
 
-    // DuckDuckGo wraps URLs through a redirect; extract the real URL
     let resolvedUrl = rawUrl;
     const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
     if (uddgMatch) {
       resolvedUrl = decodeURIComponent(uddgMatch[1]);
     }
 
-    results.push({ title, url: resolvedUrl, snippet });
+    results.push({
+      title,
+      url: normalizeSearchUrl(resolvedUrl),
+      snippet,
+    });
   }
 
   return results;
 }
 
-function buildOfficialSearchQueries(sourceName: string, sourceUrl: string): string[] {
-  const domain = safeHostname(sourceUrl);
-  const sitePart = domain ? `site:${domain}` : "";
-  return [
-    `${sourceName} ${sitePart} date limite admissibilite programme`,
-    `${sourceName} ${sitePart} OBNL communications rayonnement numerique`,
-    `${sourceName} ${sitePart} programme aide fonctionnement organisme`,
-  ]
-    .map((query) => query.trim())
-    .filter(Boolean);
-}
-
-function safeHostname(url: string): string {
+async function discoverHelloDarwinHints(sourceName: string): Promise<string[]> {
   try {
-    return new URL(url).hostname;
+    const query = `site:hellodarwin.com "${sourceName}" subvention programme`;
+    const results = await searchDuckDuckGo(query);
+
+    return results
+      .slice(0, MAX_HINTS)
+      .map((result) => cleanHintText(`${result.title} ${result.snippet}`))
+      .filter((hint) => hint.length > 20)
+      .filter(isLikelyUsefulHint)
+      .map((hint) => hint.slice(0, 220));
   } catch {
-    return "";
+    return [];
   }
 }
 
-/**
- * Fetches the text content of a URL (limited size) for AI enrichment.
- */
+function buildOfficialSearchQueries(sourceName: string, sourceUrl: string, hints: string[] = []): string[] {
+  const domain = safeHostname(sourceUrl);
+  const sitePart = domain ? `site:${domain}` : "";
+
+  const siteQueries = sitePart
+    ? [
+        `${sourceName} ${sitePart} date limite admissibilite programme`,
+        `${sourceName} ${sitePart} volet guide depot calendrier`,
+        `${sourceName} ${sitePart} depenses admissibles honoraires professionnels`,
+      ]
+    : [`${sourceName} date limite admissibilite programme officiel`];
+
+  const broadQueries = [
+    `"${sourceName}" programme officiel Quebec Canada subvention organisme`,
+    `"${sourceName}" OBNL communications rayonnement developpement organisationnel`,
+    `"${sourceName}" depenses admissibles consultants honoraires professionnels`,
+  ];
+
+  const hintQueries = hints.slice(0, MAX_HINT_QUERIES).map((hint) => {
+    const compactHint = hint
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+      .slice(0, 8)
+      .join(" ");
+    return `${compactHint} programme officiel subvention Quebec Canada`;
+  });
+
+  return [...siteQueries, ...broadQueries, ...hintQueries].map((query) => query.trim()).filter(Boolean);
+}
+
+async function searchWithXai(query: string): Promise<SearchResult[]> {
+  const client = getXaiClient();
+  if (!client) {
+    return [];
+  }
+
+  try {
+    const response = await client.chat.completions.create({
+      model: env.xaiModel,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Tu fais de la recherche web pour des programmes de subventions Quebec/Canada. " +
+            'Retourne strictement un JSON valide de la forme {"results":[{"title":"","url":"","snippet":""}]}. ' +
+            "Ne retourne que des pages plausiblement officielles ou institutionnelles. Aucun commentaire hors JSON.",
+        },
+        { role: "user", content: query },
+      ],
+      response_format: { type: "json_object" },
+      // @ts-expect-error xAI-specific extension
+      search_mode: "auto",
+    });
+
+    const raw = response.choices?.[0]?.message?.content ?? "";
+    const parsed = xaiSearchResponseSchema.safeParse(JSON.parse(raw));
+
+    if (!parsed.success) {
+      return [];
+    }
+
+    return parsed.data.results.slice(0, MAX_RESULTS).map((result) => ({
+      title: result.title.trim(),
+      url: normalizeSearchUrl(result.url),
+      snippet: result.snippet.trim().slice(0, MAX_SNIPPET_LENGTH),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function fetchPageText(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
@@ -101,7 +276,9 @@ async function fetchPageText(url: string): Promise<string | null> {
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return null;
+    }
 
     const html = await response.text();
     return html
@@ -121,12 +298,12 @@ function scoreSearchResult(result: SearchResult, sourceUrl: string) {
   const haystack = `${result.title} ${result.url} ${result.snippet}`.toLowerCase();
 
   if (isOfficialInstitutionUrl(result.url)) {
-    score += 8;
+    score += 15;
   }
 
   const sourceHostname = safeHostname(sourceUrl);
   if (sourceHostname && safeHostname(result.url) === sourceHostname) {
-    score += 10;
+    score += 12;
   }
 
   const strongKeywords = [
@@ -145,6 +322,28 @@ function scoreSearchResult(result: SearchResult, sourceUrl: string) {
     "numérique",
     "fonctionnement",
     "partenariat",
+    "image de marque",
+    "branding",
+    "marketing",
+    "developpement organisationnel",
+    "développement organisationnel",
+    "strategie numerique",
+    "stratégie numérique",
+    "visibilite",
+    "visibilité",
+    "promotion",
+    "site web",
+    "mediation",
+    "médiation",
+    "participation culturelle",
+    "volet",
+    "guide",
+    "admissibilite",
+    "admissibilité",
+    "cadre normatif",
+    "calendrier",
+    "honoraires professionnels",
+    "consultants",
   ];
 
   for (const keyword of strongKeywords) {
@@ -153,77 +352,125 @@ function scoreSearchResult(result: SearchResult, sourceUrl: string) {
     }
   }
 
-  const weakOrBadKeywords = ["accueil", "contact", "nous joindre", "a propos", "carriere", "connexion"];
-  for (const keyword of weakOrBadKeywords) {
+  const weakKeywords = ["accueil", "contact", "nous joindre", "a propos", "carriere", "connexion"];
+  for (const keyword of weakKeywords) {
     if (haystack.includes(keyword)) {
-      score -= 4;
+      score -= 5;
     }
   }
 
   return score;
 }
 
-export type WebSearchContext = {
-  snippets: string;
-  sources: string[];
-};
+function dedupeSearchResults(results: SearchResult[]) {
+  const seen = new Set<string>();
+  const deduped: SearchResult[] = [];
 
-/**
- * Performs a web search to gather supplementary context about a funding program.
- * The AI analyzer can use these snippets to better determine deadlines, eligibility, etc.
- */
+  for (const result of results) {
+    const normalizedUrl = normalizeSearchUrl(result.url);
+    if (!normalizedUrl || seen.has(normalizedUrl)) {
+      continue;
+    }
+
+    seen.add(normalizedUrl);
+    deduped.push({
+      ...result,
+      url: normalizedUrl,
+    });
+  }
+
+  return deduped;
+}
+
+function keepOnlyOfficialResults(results: SearchResult[]) {
+  return results.filter((result) => isOfficialInstitutionUrl(result.url));
+}
+
 export async function searchWebForProgramContext(
   sourceName: string,
   sourceUrl: string,
 ): Promise<WebSearchContext | null> {
+  const cacheKey = buildCacheKey(sourceName, sourceUrl);
+  const cached = getCachedContext(cacheKey);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
-    const queries = buildOfficialSearchQueries(sourceName, sourceUrl);
-    const resultSets = await Promise.all(queries.map((query) => searchDuckDuckGo(query)));
+    const helloDarwinHintsPromise = discoverHelloDarwinHints(sourceName);
+    const xaiPromise = isXaiSearchEnabled()
+      ? searchWithXai(
+          `Trouve les pages officielles québécoises et canadiennes pour le programme "${sourceName}". ` +
+            `Cherche les pages de programme, volet, guide, cadre normatif, calendrier, dépenses admissibles et dates limites. ` +
+            `Priorise quebec.ca, gouv.qc.ca, canada.ca, gc.ca, conseils des arts, téléfilm, municipalités et MRC.`,
+        )
+      : Promise.resolve([]);
 
-    const seen = new Set<string>();
-    const allResults: SearchResult[] = [];
+    const helloDarwinHints = await helloDarwinHintsPromise;
+    const queries = buildOfficialSearchQueries(sourceName, sourceUrl, helloDarwinHints);
+    const duckDuckGoSettled = await Promise.allSettled(queries.map((query) => searchDuckDuckGo(query)));
+    const xaiResults = await xaiPromise;
 
-    for (const result of resultSets.flatMap((items) => items.slice(0, RESULTS_PER_QUERY))) {
-      if (seen.has(result.url)) continue;
-      seen.add(result.url);
-      allResults.push(result);
+    const ddgResults = duckDuckGoSettled
+      .filter((result): result is PromiseFulfilledResult<SearchResult[]> => result.status === "fulfilled")
+      .flatMap((result) => result.value.slice(0, RESULTS_PER_QUERY));
+
+    const merged = dedupeSearchResults(
+      [...ddgResults, ...xaiResults].filter((result) => !isHelloDarwinUrl(result.url)),
+    );
+    const officialResults = keepOnlyOfficialResults(merged);
+
+    if (!officialResults.length) {
+      setCachedContext(cacheKey, null);
+      return null;
     }
 
-    if (allResults.length === 0) return null;
-
-    const rankedResults = allResults
+    const rankedResults = officialResults
       .map((result) => ({
         ...result,
         relevanceScore: scoreSearchResult(result, sourceUrl),
       }))
-      .sort((left, right) => right.relevanceScore - left.relevanceScore);
+      .sort((left, right) => right.relevanceScore - left.relevanceScore)
+      .slice(0, FETCHED_PAGE_COUNT);
 
-    const topResults = rankedResults.slice(0, FETCHED_PAGE_COUNT);
     const pageTexts = await Promise.all(
-      topResults.map(async (result) => {
-        const text = await fetchPageText(result.url);
-        return { ...result, pageText: text };
+      rankedResults.map(async (result) => {
+        const pageText = await fetchPageText(result.url);
+        return {
+          ...result,
+          pageText,
+        };
       }),
     );
 
-    const parts: string[] = [];
-    const sources: string[] = [];
+    const sections = pageTexts
+      .filter((result) => Boolean(result.pageText || result.snippet))
+      .map((result) => {
+        const content = result.pageText ?? result.snippet;
+        return `[${result.title || result.url}] (${result.url})\n${content}`;
+      });
 
-    for (const result of pageTexts) {
-      sources.push(result.url);
-      let section = `[${result.title}] (${result.url})\n`;
-      if (result.pageText) {
-        section += result.pageText;
-      } else {
-        section += result.snippet;
-      }
-      parts.push(section);
-    }
+    const sources = pageTexts.map((result) => result.url);
+    const snippets = sections.join("\n---\n").slice(0, 8000);
+    const value = snippets.length > 50 ? { snippets, sources } : null;
 
-    const snippets = parts.join("\n---\n").slice(0, 8000);
-
-    return snippets.length > 50 ? { snippets, sources } : null;
+    setCachedContext(cacheKey, value);
+    return value;
   } catch {
+    setCachedContext(cacheKey, null);
     return null;
   }
 }
+
+export const __test__ = {
+  isHelloDarwinUrl,
+  cleanHintText,
+  isLikelyUsefulHint,
+  normalizeSearchUrl,
+  dedupeSearchResults,
+  keepOnlyOfficialResults,
+  buildOfficialSearchQueries,
+};
+
+export type { WebSearchContext, SearchResult };

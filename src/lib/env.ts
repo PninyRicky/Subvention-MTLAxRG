@@ -19,6 +19,8 @@ export const env = {
   deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",
   deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
   aiEnabled: process.env.AI_ENABLED === "true",
+  xaiApiKey: process.env.XAI_API_KEY ?? "",
+  xaiModel: process.env.XAI_MODEL ?? "grok-3-mini",
 };
 
 export const hasSmtpConfig =

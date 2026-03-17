@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 import { env } from "@/lib/env";
 
-type ProviderPreset = "default" | "deepseek";
+type ProviderPreset = "default" | "deepseek" | "xai";
 
 const clients: Partial<Record<ProviderPreset, OpenAI>> = {};
 
@@ -11,6 +11,10 @@ export function isAiEnabled() {
 }
 
 export function getAiClient(preset: ProviderPreset = "default") {
+  if (preset === "xai") {
+    return getXaiClient();
+  }
+
   if (!isAiEnabled()) {
     return null;
   }
@@ -32,4 +36,25 @@ export function getAiClient(preset: ProviderPreset = "default") {
   }
 
   return clients[preset] ?? null;
+}
+
+export function isXaiSearchEnabled() {
+  return env.xaiApiKey.length > 0;
+}
+
+export function getXaiClient(): OpenAI | null {
+  if (!isXaiSearchEnabled()) {
+    return null;
+  }
+
+  if (!clients.xai) {
+    clients.xai = new OpenAI({
+      apiKey: env.xaiApiKey,
+      baseURL: "https://api.x.ai/v1",
+      timeout: 30_000,
+      maxRetries: 1,
+    });
+  }
+
+  return clients.xai;
 }
