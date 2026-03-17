@@ -58,6 +58,7 @@ type ProcessSourceOptions = {
   profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
   deepScan: boolean;
   seedUrls?: string[];
+  targetProgram?: FundingProgram | null;
 };
 
 const SOURCE_PROCESS_CONCURRENCY = 4;
@@ -329,6 +330,7 @@ async function upsertProgramFromParsedPayload({
   aiAnalysis,
   aiProgramCandidate,
   document,
+  targetProgram,
 }: {
   source: SourceRegistry;
   parsed: ParsedProgramPayload;
@@ -337,6 +339,7 @@ async function upsertProgramFromParsedPayload({
   aiAnalysis: AiProgramAnalysis | null;
   aiProgramCandidate: AiProgramEntry | null;
   document: DiscoveredDocument;
+  targetProgram?: FundingProgram | null;
 }) {
   const resolvedUrls = await resolveWorkingOfficialUrls({
     officialUrl: parsed.officialUrl,
@@ -344,11 +347,15 @@ async function upsertProgramFromParsedPayload({
     sourceUrl: source.url,
   });
 
-  const existingProgram = await prisma.fundingProgram.findUnique({
-    where: {
-      slug: parsed.slug,
-    },
-  });
+  const existingProgram = targetProgram
+    ? await prisma.fundingProgram.findUnique({
+        where: { id: targetProgram.id },
+      })
+    : await prisma.fundingProgram.findUnique({
+        where: {
+          slug: parsed.slug,
+        },
+      });
 
   const storedAnalysis =
     buildProgramAuditAnalysis(aiAnalysis, aiProgramCandidate, document) ??
@@ -358,62 +365,67 @@ async function upsertProgramFromParsedPayload({
       document,
     );
 
-  const program = await prisma.fundingProgram.upsert({
-    where: {
-      slug: parsed.slug,
-    },
-    update: {
-      name: parsed.name,
-      organization: parsed.organization,
-      summary: parsed.summary,
-      officialUrl: resolvedUrls.officialUrl,
-      sourceLandingUrl: resolvedUrls.sourceLandingUrl,
-      governmentLevel: parsed.governmentLevel,
-      region: parsed.region,
-      status: parsed.status,
-      confidence: parsed.confidence,
-      applicantTypes: parsed.applicantTypes,
-      sectors: parsed.sectors,
-      projectStages: parsed.projectStages,
-      eligibleExpenses: parsed.eligibleExpenses,
-      eligibleProfessionalServices: parsed.eligibleProfessionalServices,
-      maxAmount: parsed.maxAmount,
-      maxCoveragePct: parsed.maxCoveragePct,
-      details: parsed.details,
-      eligibilityNotes: parsed.eligibilityNotes,
-      applicationNotes: parsed.applicationNotes,
-      openStatusReason: parsed.openStatusReason,
-      sourceId: source.id,
-      lastVerifiedAt: new Date(),
-      ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
-    },
-    create: {
-      slug: parsed.slug,
-      name: parsed.name,
-      organization: parsed.organization,
-      summary: parsed.summary,
-      officialUrl: resolvedUrls.officialUrl,
-      sourceLandingUrl: resolvedUrls.sourceLandingUrl,
-      governmentLevel: parsed.governmentLevel,
-      region: parsed.region,
-      status: parsed.status,
-      confidence: parsed.confidence,
-      details: parsed.details,
-      eligibilityNotes: parsed.eligibilityNotes,
-      applicationNotes: parsed.applicationNotes,
-      applicantTypes: parsed.applicantTypes,
-      sectors: parsed.sectors,
-      projectStages: parsed.projectStages,
-      eligibleExpenses: parsed.eligibleExpenses,
-      eligibleProfessionalServices: parsed.eligibleProfessionalServices,
-      maxAmount: parsed.maxAmount,
-      maxCoveragePct: parsed.maxCoveragePct,
-      openStatusReason: parsed.openStatusReason,
-      sourceId: source.id,
-      lastVerifiedAt: new Date(),
-      ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
-    },
-  });
+  const programPayload = {
+    name: parsed.name,
+    organization: parsed.organization,
+    summary: parsed.summary,
+    officialUrl: resolvedUrls.officialUrl,
+    sourceLandingUrl: resolvedUrls.sourceLandingUrl,
+    governmentLevel: parsed.governmentLevel,
+    region: parsed.region,
+    status: parsed.status,
+    confidence: parsed.confidence,
+    applicantTypes: parsed.applicantTypes,
+    sectors: parsed.sectors,
+    projectStages: parsed.projectStages,
+    eligibleExpenses: parsed.eligibleExpenses,
+    eligibleProfessionalServices: parsed.eligibleProfessionalServices,
+    maxAmount: parsed.maxAmount,
+    maxCoveragePct: parsed.maxCoveragePct,
+    details: parsed.details,
+    eligibilityNotes: parsed.eligibilityNotes,
+    applicationNotes: parsed.applicationNotes,
+    openStatusReason: parsed.openStatusReason,
+    sourceId: source.id,
+    lastVerifiedAt: new Date(),
+    ...(storedAnalysis ? { aiAnalysis: storedAnalysis, aiAnalyzedAt: new Date() } : {}),
+  };
+
+  const program = targetProgram
+    ? await prisma.fundingProgram.update({
+        where: { id: targetProgram.id },
+        data: programPayload,
+      })
+    : await prisma.fundingProgram.upsert({
+        where: {
+          slug: parsed.slug,
+        },
+        update: programPayload,
+        create: {
+          slug: parsed.slug,
+          ...programPayload,
+        },
+      });
+
+  if (targetProgram?.sourceId === source.id) {
+    const currentPayload =
+      source.fallbackPayload && typeof source.fallbackPayload === "object"
+        ? (source.fallbackPayload as Record<string, unknown>)
+        : null;
+    const seedType = typeof currentPayload?.seedType === "string" ? currentPayload.seedType : null;
+
+    await prisma.sourceRegistry.update({
+      where: { id: source.id },
+      data: {
+        ...(seedType === "program" ? { url: resolvedUrls.officialUrl } : {}),
+        fallbackPayload: buildUpdatedSourceFallbackPayload(source, {
+          ...parsed,
+          officialUrl: resolvedUrls.officialUrl,
+          sourceLandingUrl: resolvedUrls.sourceLandingUrl,
+        }),
+      },
+    });
+  }
 
   await prisma.intakeWindow.deleteMany({
     where: {
@@ -475,12 +487,14 @@ async function processDocumentForSource({
   fetchRunId,
   mode,
   profiles,
+  targetProgram,
 }: {
   source: SourceRegistry;
   document: DiscoveredDocument;
   fetchRunId: string;
   mode: ScanMode;
   profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
+  targetProgram?: FundingProgram | null;
 }) {
   const metrics = createEmptyMetrics();
 
@@ -503,10 +517,13 @@ async function processDocumentForSource({
     aiAnalysis,
     document.textContent,
   );
+  const parsedProgramsToProcess = targetProgram
+    ? selectParsedProgramsForTarget(targetProgram, parsedPrograms)
+    : parsedPrograms;
 
   const aiPrograms = aiAnalysis?.programs ?? [];
 
-  for (const parsed of parsedPrograms) {
+  for (const parsed of parsedProgramsToProcess) {
     const aiProgramCandidate =
       aiPrograms.find((candidate) => candidate.programName && parsed.name.includes(candidate.programName)) ??
       aiPrograms.find((candidate) => candidate.officialUrl === parsed.officialUrl) ??
@@ -521,6 +538,7 @@ async function processDocumentForSource({
       aiAnalysis,
       aiProgramCandidate,
       document,
+      targetProgram,
     });
 
     metrics.discoveredCount += programMetrics.discoveredCount;
@@ -556,6 +574,106 @@ function getSeedUrlsForProgram(program: Pick<FundingProgram, "officialUrl" | "so
   return [...uniqueUrls];
 }
 
+function normalizeProgramComparisonText(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scoreParsedProgramAgainstTarget(targetProgram: FundingProgram, parsed: ParsedProgramPayload) {
+  let score = 0;
+  const targetName = normalizeProgramComparisonText(targetProgram.name);
+  const parsedName = normalizeProgramComparisonText(parsed.name);
+  const targetOfficialUrl = targetProgram.officialUrl.trim();
+  const targetSourceLandingUrl = targetProgram.sourceLandingUrl?.trim();
+
+  if (parsed.officialUrl === targetOfficialUrl) {
+    score += 20;
+  }
+
+  if (targetSourceLandingUrl && parsed.officialUrl === targetSourceLandingUrl) {
+    score += 12;
+  }
+
+  if (parsed.sourceLandingUrl && parsed.sourceLandingUrl === targetOfficialUrl) {
+    score += 8;
+  }
+
+  if (parsedName === targetName) {
+    score += 16;
+  }
+
+  if (parsedName.includes(targetName) || targetName.includes(parsedName)) {
+    score += 10;
+  }
+
+  const targetWords = new Set(targetName.split(" ").filter((word) => word.length > 3));
+  const parsedWords = new Set(parsedName.split(" ").filter((word) => word.length > 3));
+
+  for (const word of targetWords) {
+    if (parsedWords.has(word)) {
+      score += 2;
+    }
+  }
+
+  score += Math.round(parsed.confidence / 20);
+
+  return score;
+}
+
+function selectParsedProgramsForTarget(targetProgram: FundingProgram, parsedPrograms: ParsedProgramPayload[]) {
+  if (!parsedPrograms.length) {
+    return [];
+  }
+
+  const ranked = [...parsedPrograms].sort(
+    (left, right) =>
+      scoreParsedProgramAgainstTarget(targetProgram, right) -
+      scoreParsedProgramAgainstTarget(targetProgram, left),
+  );
+
+  return [ranked[0]];
+}
+
+function buildUpdatedSourceFallbackPayload(source: SourceRegistry, parsed: ParsedProgramPayload) {
+  const currentPayload =
+    source.fallbackPayload && typeof source.fallbackPayload === "object"
+      ? (source.fallbackPayload as Record<string, unknown>)
+      : {};
+
+  return {
+    ...currentPayload,
+    name: parsed.name,
+    organization: parsed.organization,
+    summary: parsed.summary,
+    officialUrl: parsed.officialUrl,
+    governmentLevel: parsed.governmentLevel,
+    region: parsed.region,
+    status: parsed.status,
+    confidence: parsed.confidence,
+    details: parsed.details,
+    eligibilityNotes: parsed.eligibilityNotes,
+    applicationNotes: parsed.applicationNotes,
+    applicantTypes: parsed.applicantTypes,
+    sectors: parsed.sectors,
+    projectStages: parsed.projectStages,
+    eligibleExpenses: parsed.eligibleExpenses,
+    eligibleProfessionalServices: parsed.eligibleProfessionalServices,
+    maxAmount: parsed.maxAmount,
+    maxCoveragePct: parsed.maxCoveragePct,
+    openStatusReason: parsed.openStatusReason,
+    intakeWindow: {
+      rolling: parsed.intakeWindow.rolling,
+      opensAt: parsed.intakeWindow.opensAt?.toISOString() ?? null,
+      closesAt: parsed.intakeWindow.closesAt?.toISOString() ?? null,
+    },
+  };
+}
+
 async function processSourceForFetchRun({
   source,
   fetchRunId,
@@ -563,6 +681,7 @@ async function processSourceForFetchRun({
   profiles,
   deepScan,
   seedUrls,
+  targetProgram,
 }: ProcessSourceOptions) {
   try {
     const discovery = await discoverSourceDocuments(source, {
@@ -578,6 +697,7 @@ async function processSourceForFetchRun({
         fetchRunId,
         mode,
         profiles,
+        targetProgram,
       });
 
       metrics.discoveredCount += documentMetrics.discoveredCount;
@@ -722,6 +842,7 @@ export async function executeFetchRun({
       source: SourceRegistry;
       deepScan: boolean;
       seedUrls?: string[];
+      targetProgram?: FundingProgram | null;
     }> = [];
 
     if (scope === ScanScope.PROGRAM && targetProgram?.source) {
@@ -729,6 +850,7 @@ export async function executeFetchRun({
         source: targetProgram.source,
         deepScan: true,
         seedUrls: getSeedUrlsForProgram(targetProgram, targetProgram.source),
+        targetProgram,
       });
     } else {
       const sources = await prisma.sourceRegistry.findMany({
@@ -760,6 +882,7 @@ export async function executeFetchRun({
         profiles,
         deepScan: job.deepScan,
         seedUrls: job.seedUrls,
+        targetProgram: job.targetProgram,
       }),
     );
 
