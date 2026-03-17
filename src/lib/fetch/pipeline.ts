@@ -4,7 +4,11 @@ import { analyzeProgramPage } from "@/lib/ai/analyzer";
 import { isAiEnabled } from "@/lib/ai/provider";
 import type { AiProgramAnalysis, AiProgramEntry } from "@/lib/ai/schema";
 import { env } from "@/lib/env";
-import { discoverSourceDocuments, type DiscoveredDocument } from "@/lib/fetch/deep-scan";
+import {
+  discoverSourceDocuments,
+  isGeneratedRegionalPortalSource,
+  type DiscoveredDocument,
+} from "@/lib/fetch/deep-scan";
 import { parseProgramsFromSource, type ParsedProgramPayload } from "@/lib/fetch/parsers";
 import { resolveWorkingOfficialUrls } from "@/lib/link-validation";
 import { prisma } from "@/lib/prisma";
@@ -647,7 +651,11 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
     let pdfCount = 0;
     let voletCount = 0;
     const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
-    const sourceResults = await mapWithConcurrency(officialSources, SOURCE_PROCESS_CONCURRENCY, (source) =>
+    const sourcesToProcess =
+      mode === ScanMode.MANUAL
+        ? officialSources.filter((source) => !isGeneratedRegionalPortalSource(source))
+        : officialSources;
+    const sourceResults = await mapWithConcurrency(sourcesToProcess, SOURCE_PROCESS_CONCURRENCY, (source) =>
       processSourceForFetchRun({
         source,
         fetchRunId: fetchRun.id,
@@ -671,7 +679,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       where: { id: fetchRun.id },
       data: {
         status: ScanStatus.COMPLETED,
-        sourceCount: officialSources.length,
+        sourceCount: sourcesToProcess.length,
         discoveredCount,
         updatedCount,
         closedCount,
@@ -683,7 +691,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
         finishedAt: new Date(),
         notes:
           mode === ScanMode.MANUAL
-            ? `Deep scan manuel officiel avec crawl BFS limité, HTML/PDF et extraction multi-volets.`
+            ? `Deep scan manuel officiel avec crawl BFS limité, HTML/PDF et extraction multi-volets sur les sources prioritaires.`
             : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
       },
     });

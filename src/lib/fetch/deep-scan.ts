@@ -72,6 +72,26 @@ function getSeedType(source: SourceRegistry): CrawlSeedType {
   return "program";
 }
 
+export function isGeneratedRegionalPortalSource(source: SourceRegistry) {
+  const payload = (source.fallbackPayload ?? null) as Record<string, unknown> | null;
+  const details = typeof payload?.details === "string" ? payload.details.toLowerCase() : "";
+  const name = source.name.toLowerCase();
+
+  return (
+    source.governmentLevel?.toLowerCase() === "regional" &&
+    (name.includes("portail officiel territorial") ||
+      details.includes("cette fiche est générée à partir du répertoire officiel des mrc du québec"))
+  );
+}
+
+function shouldUseDeepScanForSource(source: SourceRegistry, manualMode: boolean) {
+  if (!manualMode) {
+    return false;
+  }
+
+  return !isGeneratedRegionalPortalSource(source);
+}
+
 function isPdfUrl(url: string) {
   return url.toLowerCase().endsWith(".pdf");
 }
@@ -237,11 +257,14 @@ function extractCandidateLinks(html: string, currentUrl: string, sourceUrl: stri
 export const __testing__ = {
   extractCandidateLinks,
   getSeedType,
+  shouldUseDeepScanForSource,
+  isGeneratedRegionalPortalSource,
 };
 
 export async function discoverSourceDocuments(source: SourceRegistry, manualMode: boolean) {
   const documents: DiscoveredDocument[] = [];
   const seedType = getSeedType(source);
+  const shouldDeepScan = shouldUseDeepScanForSource(source, manualMode);
   const visited = new Set<string>();
   const queue: Array<{ url: string; depth: number }> = [{ url: source.url, depth: 0 }];
   let htmlCount = 0;
@@ -255,11 +278,11 @@ export async function discoverSourceDocuments(source: SourceRegistry, manualMode
       continue;
     }
 
-    if (!manualMode && current.depth > 0) {
+    if (!shouldDeepScan && current.depth > 0) {
       continue;
     }
 
-    if (seedType === "program" && current.depth > 0) {
+    if ((seedType === "program" || !shouldDeepScan) && current.depth > 0) {
       continue;
     }
 
@@ -292,7 +315,7 @@ export async function discoverSourceDocuments(source: SourceRegistry, manualMode
       depth: current.depth,
     });
 
-    if (!manualMode || fetched.contentKind !== "HTML" || current.depth >= MAX_DEPTH) {
+    if (!shouldDeepScan || fetched.contentKind !== "HTML" || current.depth >= MAX_DEPTH) {
       continue;
     }
 
