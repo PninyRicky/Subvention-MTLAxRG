@@ -63,6 +63,7 @@ type ProcessSourceOptions = {
   seedUrls?: string[];
   targetProgram?: FundingProgram | null;
   allowWebEnrichment: boolean;
+  forceDeepSeek: boolean;
 };
 
 const SOURCE_PROCESS_CONCURRENCY = 4;
@@ -276,6 +277,7 @@ async function analyzeDocument(
   document: DiscoveredDocument,
   mode: ScanMode,
   allowWebEnrichment: boolean,
+  forceDeepSeek: boolean,
 ): Promise<AiProgramAnalysis | null> {
   if (!isAiEnabled()) {
     return null;
@@ -295,7 +297,7 @@ async function analyzeDocument(
     documentUrl: document.url,
     documentType: document.contentKind,
     depth: document.depth,
-  }, { allowWebEnrichment });
+  }, { allowWebEnrichment, forceDeepSeek });
 
   if (!analysis) {
     return null;
@@ -542,6 +544,7 @@ async function processDocumentForSource({
   profiles,
   targetProgram,
   allowWebEnrichment,
+  forceDeepSeek,
 }: {
   source: SourceRegistry;
   document: DiscoveredDocument;
@@ -550,6 +553,7 @@ async function processDocumentForSource({
   profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
   targetProgram?: FundingProgram | null;
   allowWebEnrichment: boolean;
+  forceDeepSeek: boolean;
 }) {
   const metrics = createEmptyMetrics();
 
@@ -564,7 +568,7 @@ async function processDocumentForSource({
     },
   });
 
-  const aiAnalysis = await analyzeDocument(source, document, mode, allowWebEnrichment);
+  const aiAnalysis = await analyzeDocument(source, document, mode, allowWebEnrichment, forceDeepSeek);
   const parsedPrograms = parseProgramsFromSource(
     source,
     document.contentKind === "HTML" ? document.rawContent : null,
@@ -738,6 +742,7 @@ async function processSourceForFetchRun({
   seedUrls,
   targetProgram,
   allowWebEnrichment,
+  forceDeepSeek,
 }: ProcessSourceOptions) {
   try {
     const discovery = await discoverSourceDocuments(source, {
@@ -755,6 +760,7 @@ async function processSourceForFetchRun({
         profiles,
         targetProgram,
         allowWebEnrichment,
+        forceDeepSeek,
       });
 
       metrics.discoveredCount += documentMetrics.discoveredCount;
@@ -825,7 +831,22 @@ export async function executeFetchRun({
   });
 
   if (running) {
-    return running;
+    const sameProgramRun =
+      scope === ScanScope.PROGRAM &&
+      running.scope === ScanScope.PROGRAM &&
+      running.targetProgramId === targetProgramId;
+
+    const sameSegmentRun =
+      scope === ScanScope.GLOBAL &&
+      Boolean(targetLabel) &&
+      running.scope === ScanScope.GLOBAL &&
+      running.targetLabel === targetLabel;
+
+    if (sameProgramRun || sameSegmentRun) {
+      return running;
+    }
+
+    throw new Error("Un autre scan est déjà en cours. Attends sa fin avant d’en lancer un nouveau.");
   }
 
   if (mode === ScanMode.SCHEDULED) {
@@ -904,6 +925,7 @@ export async function executeFetchRun({
       seedUrls?: string[];
       targetProgram?: FundingProgram | null;
       allowWebEnrichment: boolean;
+      forceDeepSeek: boolean;
     }> = [];
 
     if (scope === ScanScope.PROGRAM && targetProgram?.source) {
@@ -913,6 +935,7 @@ export async function executeFetchRun({
         seedUrls: getSeedUrlsForProgram(targetProgram, targetProgram.source),
         targetProgram,
         allowWebEnrichment: true,
+        forceDeepSeek: true,
       });
     } else {
       const sources = await prisma.sourceRegistry.findMany({
@@ -943,6 +966,7 @@ export async function executeFetchRun({
           source,
           deepScan: false,
           allowWebEnrichment: false,
+          forceDeepSeek: false,
         })),
       );
     }
@@ -957,6 +981,7 @@ export async function executeFetchRun({
         seedUrls: job.seedUrls,
         targetProgram: job.targetProgram,
         allowWebEnrichment: job.allowWebEnrichment,
+        forceDeepSeek: job.forceDeepSeek,
       }),
     );
 
@@ -987,7 +1012,7 @@ export async function executeFetchRun({
         finishedAt: new Date(),
         notes:
           scope === ScanScope.PROGRAM
-            ? `Scan approfondi ciblé sur le programme avec crawl BFS limité, PDF, volets et URL officielles directes.`
+            ? `Scan approfondi ciblé sur le programme avec crawl BFS limité, PDF, volets et URL officielles directes. Analyse IA forcée sur DeepSeek.`
             : targetLabel
               ? `Scan ciblé de segment sur ${targetLabel}.`
             : mode === ScanMode.MANUAL

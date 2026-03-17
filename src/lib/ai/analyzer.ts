@@ -17,6 +17,7 @@ export type SourceMetadata = {
 
 type AnalyzeOptions = {
   allowWebEnrichment?: boolean;
+  forceDeepSeek?: boolean;
 };
 
 /**
@@ -44,12 +45,14 @@ function needsEnrichment(analysis: AiProgramAnalysis): boolean {
 
 async function callAi(
   messages: { role: "system" | "user"; content: string }[],
+  options: { forceDeepSeek?: boolean } = {},
 ): Promise<AiProgramAnalysis | null> {
-  const client = getAiClient();
+  const forceDeepSeek = options.forceDeepSeek ?? false;
+  const client = getAiClient(forceDeepSeek ? "deepseek" : "default");
   if (!client) return null;
 
   const response = await client.chat.completions.create({
-    model: env.aiModel,
+    model: forceDeepSeek ? env.deepseekModel : env.aiModel,
     messages,
     temperature: 0.1,
     max_tokens: 1500,
@@ -81,6 +84,7 @@ export async function analyzeProgramPage(
   }
 
   const allowWebEnrichment = options.allowWebEnrichment ?? true;
+  const forceDeepSeek = options.forceDeepSeek ?? false;
 
   const currentDate = getTorontoLocalDateKey();
 
@@ -89,7 +93,7 @@ export async function analyzeProgramPage(
     const firstPass = await callAi([
       { role: "system", content: buildSystemPrompt(currentDate) },
       { role: "user", content: buildUserPrompt(sourceMetadata, bodyText) },
-    ]);
+    ], { forceDeepSeek });
 
     if (!firstPass || !firstPass.programs.length) return null;
 
@@ -112,7 +116,7 @@ export async function analyzeProgramPage(
               webContext.sources,
             ),
           },
-        ]);
+        ], { forceDeepSeek });
 
         if (enriched && enriched.programs.length > 0) {
           const firstPassConfidence = Math.max(...firstPass.programs.map((program) => program.confidence ?? 0));

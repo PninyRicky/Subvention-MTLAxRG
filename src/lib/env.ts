@@ -15,6 +15,9 @@ export const env = {
   aiApiKey: process.env.AI_API_KEY ?? "",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
   aiModel: process.env.AI_MODEL ?? "deepseek-chat",
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? process.env.AI_API_KEY ?? "",
+  deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",
+  deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
   aiEnabled: process.env.AI_ENABLED === "true",
 };
 

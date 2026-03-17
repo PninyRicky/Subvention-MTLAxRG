@@ -88,7 +88,10 @@ export default async function ScansPage() {
                               : "Veille globale"}
                         </p>
                         {run.scope === ScanScope.PROGRAM && run.targetProgram ? (
-                          <p className="max-w-[240px] text-black/48">{run.targetProgram.name}</p>
+                          <>
+                            <p className="max-w-[240px] text-black/48">{run.targetProgram.name}</p>
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-black/35">IA: DeepSeek</p>
+                          </>
                         ) : run.targetLabel ? (
                           <p className="max-w-[240px] text-black/48">{run.targetLabel}</p>
                         ) : null}
