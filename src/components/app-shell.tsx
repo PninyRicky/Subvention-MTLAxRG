@@ -167,24 +167,24 @@ export function AppShell({
                                   <div
                                     key={institution.slug}
                                     className={cn(
-                                      "flex items-center gap-2 rounded-xl px-2 py-1",
+                                      "grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-2 py-1",
                                       activeInstitution ? "bg-black/[0.06]" : "",
                                     )}
                                   >
                                     <Link
                                       href={institution.href}
                                       className={cn(
-                                        "flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-1 py-1 text-xs transition",
+                                        "min-w-0 rounded-xl px-1 py-1 text-xs transition",
                                         activeInstitution
                                           ? "text-black"
                                           : "text-black/60 hover:text-black",
                                       )}
                                     >
                                       <span className="truncate">{institution.label}</span>
-                                      <span className="shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
-                                        {institution.count}
-                                      </span>
                                     </Link>
+                                    <span className="shrink-0 px-1 text-[11px] tracking-[0.08em] text-black/44">
+                                      {institution.count}
+                                    </span>
                                     <SegmentScanButton
                                       label={institution.targetLabel}
                                       sourceIds={institution.sourceIds}
@@ -236,7 +236,7 @@ export function AppShell({
 
                                 return (
                                   <div key={regionName} className="space-y-1">
-                                    <div className="flex items-center gap-2 rounded-xl px-3 py-2 transition hover:bg-black/[0.03]">
+                                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-black/[0.03]">
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -245,13 +245,13 @@ export function AppShell({
                                             [regionName]: !regionOpen,
                                           }))
                                         }
-                                        className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left text-xs text-black/60 transition hover:text-black"
+                                        className="min-w-0 text-left text-xs text-black/60 transition hover:text-black"
                                       >
                                         <span className="truncate uppercase tracking-[0.18em] text-black/38">{regionName}</span>
-                                        <span className="ml-auto shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
-                                          {regionMeta?.count ?? entries.reduce((sum, entry) => sum + entry.count, 0)}
-                                        </span>
                                       </button>
+                                      <span className="shrink-0 px-1 text-[11px] tracking-[0.08em] text-black/44">
+                                        {regionMeta?.count ?? entries.reduce((sum, entry) => sum + entry.count, 0)}
+                                      </span>
                                       {regionMeta ? (
                                         <SegmentScanButton
                                           label={regionMeta.targetLabel}
@@ -276,24 +276,24 @@ export function AppShell({
                                             <div
                                               key={mrc.slug}
                                               className={cn(
-                                                "flex items-center gap-2 rounded-xl px-2 py-1",
+                                                "grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-2 py-1",
                                                 activeMrc ? "bg-black/[0.06]" : "",
                                               )}
                                             >
                                               <Link
                                                 href={mrc.href}
                                                 className={cn(
-                                                  "flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-1 py-1 text-xs transition",
+                                                  "min-w-0 rounded-xl px-1 py-1 text-xs transition",
                                                   activeMrc
                                                     ? "text-black"
                                                     : "text-black/60 hover:text-black",
                                                 )}
                                               >
                                                 <span className="truncate">{mrc.name}</span>
-                                                <span className="shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-black/52">
-                                                  {mrc.count}
-                                                </span>
                                               </Link>
+                                              <span className="shrink-0 px-1 text-[11px] tracking-[0.08em] text-black/44">
+                                                {mrc.count}
+                                              </span>
                                               <SegmentScanButton
                                                 label={mrc.targetLabel}
                                                 sourceIds={mrc.sourceIds}
