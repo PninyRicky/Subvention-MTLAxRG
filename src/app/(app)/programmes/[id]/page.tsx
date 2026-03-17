@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { MatchStatus } from "@prisma/client";
+import { MatchStatus, ScanScope } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 
 import { ProgramOrganizationsCard } from "@/components/program-organizations-card";
+import { ProgramDeepScanButton } from "@/components/program-deep-scan-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FavoriteToggleButton } from "@/components/favorite-toggle-button";
@@ -38,6 +39,16 @@ export default async function ProgrammeDetailPage({
     notFound();
   }
 
+  const latestProgramRun = await prisma.fetchRun.findFirst({
+    where: {
+      scope: ScanScope.PROGRAM,
+      targetProgramId: program.id,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
   const tone =
     program.status === "OPEN" ? "open" : program.status === "REVIEW" ? "review" : "closed";
   const audit = parseJsonField<Record<string, unknown> | null>(program.aiAnalysis, null);
@@ -63,9 +74,25 @@ export default async function ProgrammeDetailPage({
             <p className="mt-4 text-sm leading-7 text-black/68">{program.summary}</p>
           </div>
 
-          <div className="min-w-[260px] space-y-2 text-sm text-black/64">
-            <div className="mb-4">
+          <div className="min-w-[260px] space-y-3 text-sm text-black/64">
+            <div className="mb-2 flex flex-col items-end gap-3">
+              <ProgramDeepScanButton programId={program.id} />
               <FavoriteToggleButton programId={program.id} isFavorite={program.isFavorite} />
+            </div>
+            <div className="rounded-[24px] border border-black/10 bg-black/[0.02] p-4 text-xs leading-6 text-black/66">
+              <p className="font-medium text-black">Scan ciblé du programme</p>
+              <p className="mt-1">
+                Ce bouton approfondit uniquement cette fiche: volets, PDF, dates exactes, statut officiel et URL directe.
+              </p>
+              <p className="mt-2">
+                <span className="font-medium text-black">Dernier scan ciblé:</span>{" "}
+                {latestProgramRun ? formatDateTime(latestProgramRun.createdAt) : "Jamais lancé"}
+              </p>
+              {latestProgramRun ? (
+                <p>
+                  <span className="font-medium text-black">Statut:</span> {latestProgramRun.status}
+                </p>
+              ) : null}
             </div>
             <p>
               <span className="font-medium text-black">Confiance:</span> {program.confidence}%

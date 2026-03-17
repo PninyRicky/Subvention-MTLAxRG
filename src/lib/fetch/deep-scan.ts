@@ -261,12 +261,19 @@ export const __testing__ = {
   isGeneratedRegionalPortalSource,
 };
 
-export async function discoverSourceDocuments(source: SourceRegistry, manualMode: boolean) {
+export async function discoverSourceDocuments(
+  source: SourceRegistry,
+  options: {
+    manualMode: boolean;
+    seedUrls?: string[];
+  },
+) {
   const documents: DiscoveredDocument[] = [];
   const seedType = getSeedType(source);
-  const shouldDeepScan = shouldUseDeepScanForSource(source, manualMode);
+  const shouldDeepScan = shouldUseDeepScanForSource(source, options.manualMode);
+  const seedUrls = (options.seedUrls?.length ? options.seedUrls : [source.url]).filter(Boolean);
   const visited = new Set<string>();
-  const queue: Array<{ url: string; depth: number }> = [{ url: source.url, depth: 0 }];
+  const queue: Array<{ url: string; depth: number }> = seedUrls.map((url) => ({ url, depth: 0 }));
   let htmlCount = 0;
   let pdfCount = 0;
 

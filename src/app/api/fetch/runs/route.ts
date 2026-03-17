@@ -7,6 +7,8 @@ export async function GET() {
     include: {
       initiatedBy: true,
       documents: true,
+      targetProgram: true,
+      targetSource: true,
     },
     orderBy: {
       createdAt: "desc",

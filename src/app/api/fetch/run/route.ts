@@ -1,4 +1,4 @@
-import { ScanMode } from "@prisma/client";
+import { ScanMode, ScanScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getViewer } from "@/lib/auth";
@@ -15,6 +15,7 @@ export async function POST() {
 
   const run = await executeFetchRun({
     mode: ScanMode.MANUAL,
+    scope: ScanScope.GLOBAL,
     initiatedById,
   });
 

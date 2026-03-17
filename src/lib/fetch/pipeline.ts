@@ -1,4 +1,13 @@
-import { Prisma, ProgramStatus, ReviewStatus, ScanMode, ScanStatus, type SourceRegistry } from "@prisma/client";
+import {
+  Prisma,
+  ProgramStatus,
+  ReviewStatus,
+  ScanMode,
+  ScanScope,
+  ScanStatus,
+  type FundingProgram,
+  type SourceRegistry,
+} from "@prisma/client";
 
 import { analyzeProgramPage } from "@/lib/ai/analyzer";
 import { isAiEnabled } from "@/lib/ai/provider";
@@ -18,7 +27,9 @@ import { isOfficialInstitutionUrl } from "@/lib/source-registry";
 
 type PipelineOptions = {
   mode: ScanMode;
+  scope?: ScanScope;
   initiatedById?: string | null;
+  targetProgramId?: string | null;
 };
 
 type CachedAiProgramAnalysis = AiProgramAnalysis & {
@@ -38,6 +49,15 @@ type ProcessingMetrics = {
   htmlPageCount: number;
   pdfCount: number;
   failed: boolean;
+};
+
+type ProcessSourceOptions = {
+  source: SourceRegistry;
+  fetchRunId: string;
+  mode: ScanMode;
+  profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
+  deepScan: boolean;
+  seedUrls?: string[];
 };
 
 const SOURCE_PROCESS_CONCURRENCY = 4;
@@ -517,19 +537,38 @@ async function processDocumentForSource({
   return metrics;
 }
 
+function getSeedUrlsForProgram(program: Pick<FundingProgram, "officialUrl" | "sourceLandingUrl">, source: SourceRegistry) {
+  const seedCandidates = [program.officialUrl, program.sourceLandingUrl, source.url];
+  const uniqueUrls = new Set<string>();
+
+  for (const candidate of seedCandidates) {
+    if (!candidate || !candidate.startsWith("http")) {
+      continue;
+    }
+
+    if (!isOfficialInstitutionUrl(candidate)) {
+      continue;
+    }
+
+    uniqueUrls.add(candidate);
+  }
+
+  return [...uniqueUrls];
+}
+
 async function processSourceForFetchRun({
   source,
   fetchRunId,
   mode,
   profiles,
-}: {
-  source: SourceRegistry;
-  fetchRunId: string;
-  mode: ScanMode;
-  profiles: Awaited<ReturnType<typeof prisma.serviceProfile.findMany>>;
-}) {
+  deepScan,
+  seedUrls,
+}: ProcessSourceOptions) {
   try {
-    const discovery = await discoverSourceDocuments(source, mode === ScanMode.MANUAL);
+    const discovery = await discoverSourceDocuments(source, {
+      manualMode: deepScan,
+      seedUrls,
+    });
     const metrics = createEmptyMetrics();
 
     for (const document of discovery.documents) {
@@ -586,7 +625,12 @@ async function mapWithConcurrency<T, TResult>(
   return results;
 }
 
-export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) {
+export async function executeFetchRun({
+  mode,
+  initiatedById,
+  scope = ScanScope.GLOBAL,
+  targetProgramId,
+}: PipelineOptions) {
   await expireStaleFetchRuns();
 
   const running = await prisma.fetchRun.findFirst({
@@ -620,27 +664,50 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
     }
   }
 
+  let targetProgram:
+    | (FundingProgram & {
+        source: SourceRegistry | null;
+      })
+    | null = null;
+
+  if (scope === ScanScope.PROGRAM) {
+    if (!targetProgramId) {
+      throw new Error("Programme cible manquant pour le scan approfondi.");
+    }
+
+    targetProgram = await prisma.fundingProgram.findUnique({
+      where: { id: targetProgramId },
+      include: {
+        source: true,
+      },
+    });
+
+    if (!targetProgram) {
+      throw new Error("Programme introuvable pour le scan approfondi.");
+    }
+
+    if (!targetProgram.source || !isOfficialInstitutionUrl(targetProgram.source.url)) {
+      throw new Error("Aucune source officielle exploitable n’est rattachée à ce programme.");
+    }
+  }
+
   const fetchRun = await prisma.fetchRun.create({
     data: {
       mode,
+      scope,
       status: ScanStatus.RUNNING,
       startedAt: new Date(),
       initiatedById: initiatedById ?? null,
+      targetProgramId: targetProgram?.id ?? null,
+      targetSourceId: targetProgram?.sourceId ?? null,
+      targetLabel: targetProgram?.name ?? null,
     },
   });
 
   try {
-    const [sources, profiles] = await Promise.all([
-      prisma.sourceRegistry.findMany({
-        where: {
-          active: true,
-          type: "OFFICIAL",
-        },
-      }),
-      prisma.serviceProfile.findMany({
-        where: { active: true },
-      }),
-    ]);
+    const profiles = await prisma.serviceProfile.findMany({
+      where: { active: true },
+    });
 
     let discoveredCount = 0;
     let updatedCount = 0;
@@ -650,17 +717,49 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
     let htmlPageCount = 0;
     let pdfCount = 0;
     let voletCount = 0;
-    const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
-    const sourcesToProcess =
-      mode === ScanMode.MANUAL
-        ? officialSources.filter((source) => !isGeneratedRegionalPortalSource(source))
-        : officialSources;
-    const sourceResults = await mapWithConcurrency(sourcesToProcess, SOURCE_PROCESS_CONCURRENCY, (source) =>
+
+    const sourceJobs: Array<{
+      source: SourceRegistry;
+      deepScan: boolean;
+      seedUrls?: string[];
+    }> = [];
+
+    if (scope === ScanScope.PROGRAM && targetProgram?.source) {
+      sourceJobs.push({
+        source: targetProgram.source,
+        deepScan: true,
+        seedUrls: getSeedUrlsForProgram(targetProgram, targetProgram.source),
+      });
+    } else {
+      const sources = await prisma.sourceRegistry.findMany({
+        where: {
+          active: true,
+          type: "OFFICIAL",
+        },
+      });
+
+      const officialSources = sources.filter((source) => isOfficialInstitutionUrl(source.url));
+      const sourcesToProcess =
+        mode === ScanMode.MANUAL
+          ? officialSources.filter((source) => !isGeneratedRegionalPortalSource(source))
+          : officialSources;
+
+      sourceJobs.push(
+        ...sourcesToProcess.map((source) => ({
+          source,
+          deepScan: false,
+        })),
+      );
+    }
+
+    const sourceResults = await mapWithConcurrency(sourceJobs, SOURCE_PROCESS_CONCURRENCY, (job) =>
       processSourceForFetchRun({
-        source,
+        source: job.source,
         fetchRunId: fetchRun.id,
         mode,
         profiles,
+        deepScan: job.deepScan,
+        seedUrls: job.seedUrls,
       }),
     );
 
@@ -679,7 +778,7 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
       where: { id: fetchRun.id },
       data: {
         status: ScanStatus.COMPLETED,
-        sourceCount: sourcesToProcess.length,
+        sourceCount: sourceJobs.length,
         discoveredCount,
         updatedCount,
         closedCount,
@@ -690,9 +789,11 @@ export async function executeFetchRun({ mode, initiatedById }: PipelineOptions) 
         voletCount,
         finishedAt: new Date(),
         notes:
-          mode === ScanMode.MANUAL
-            ? `Deep scan manuel officiel avec crawl BFS limité, HTML/PDF et extraction multi-volets sur les sources prioritaires.`
-            : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
+          scope === ScanScope.PROGRAM
+            ? `Scan approfondi ciblé sur le programme avec crawl BFS limité, PDF, volets et URL officielles directes.`
+            : mode === ScanMode.MANUAL
+              ? `Scan de veille global avec collecte officielle légère et mise à jour rapide des programmes pertinents.`
+              : `Scan planifié léger avec collecte officielle et analyse ciblée.`,
       },
     });
   } catch (error) {

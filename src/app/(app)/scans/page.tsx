@@ -1,4 +1,4 @@
-import { ScanStatus } from "@prisma/client";
+import { ScanScope, ScanStatus } from "@prisma/client";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,12 @@ export default async function ScansPage() {
     include: {
       initiatedBy: true,
       documents: true,
+      targetProgram: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",
@@ -36,7 +42,8 @@ export default async function ScansPage() {
         <Card>
           <p className="text-[11px] uppercase tracking-[0.18em] text-black/55">Regles d’execution</p>
           <ul className="mt-5 space-y-3 text-sm leading-6 text-black/68">
-            <li>Les scans manuels utilisent un crawl officiel profond BFS limite avec pages HTML et PDF.</li>
+            <li>Le bouton global lance une veille rapide pour découvrir et mettre à jour les programmes pertinents.</li>
+            <li>Depuis une fiche programme, le bouton ciblé lance un scan approfondi avec pages HTML, PDF et volets.</li>
             <li>Les scans planifies restent plus legers pour preserver la stabilite sur Vercel.</li>
             <li>Le bouton de scan se bloque si un run est deja en cours ou en file.</li>
             <li>Chaque run journalise les sources, documents, volets crees, fermetures et cas a revoir.</li>
@@ -49,6 +56,7 @@ export default async function ScansPage() {
               <thead className="border-b border-black/10 bg-black/[0.02] text-left text-[11px] uppercase tracking-[0.18em] text-black/55">
                 <tr>
                   <th className="px-6 py-4 font-medium">Statut</th>
+                  <th className="px-6 py-4 font-medium">Portée</th>
                   <th className="px-6 py-4 font-medium">Mode</th>
                   <th className="px-6 py-4 font-medium">Lancement</th>
                   <th className="px-6 py-4 font-medium">Sources</th>
@@ -70,6 +78,12 @@ export default async function ScansPage() {
                     <tr key={run.id} className="border-b border-black/10 align-top last:border-b-0">
                       <td className="px-6 py-5">
                         <Badge tone={tone}>{run.status}</Badge>
+                      </td>
+                      <td className="px-6 py-5 text-sm leading-6 text-black/64">
+                        <p>{run.scope === ScanScope.PROGRAM ? "Programme" : "Veille globale"}</p>
+                        {run.scope === ScanScope.PROGRAM && run.targetProgram ? (
+                          <p className="max-w-[240px] text-black/48">{run.targetProgram.name}</p>
+                        ) : null}
                       </td>
                       <td className="px-6 py-5 text-sm text-black/64">{run.mode}</td>
                       <td className="px-6 py-5 text-sm text-black/64">{formatDateTime(run.createdAt)}</td>

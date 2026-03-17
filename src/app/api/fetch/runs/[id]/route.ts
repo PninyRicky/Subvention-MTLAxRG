@@ -14,6 +14,8 @@ export async function GET(
       initiatedBy: true,
       documents: true,
       reviews: true,
+      targetProgram: true,
+      targetSource: true,
     },
   });
 
